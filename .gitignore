@@ -6,3 +6,8 @@ __pycache__/
 htmlcov/
 .venv/
 var/
+venv/
+node_modules/
+*.pyc
+.env
+dist/
