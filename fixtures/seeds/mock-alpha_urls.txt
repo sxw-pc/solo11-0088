@@ -1,0 +1,12 @@
+# Synthetic seed list for mock-alpha. The last two entries are deliberate
+# negative cases: one outside the registered path, one non-loopback.
+http://127.0.0.1:5021/mock-alpha/index.html
+http://127.0.0.1:5021/mock-alpha/docs/page-1.html
+http://127.0.0.1:5021/mock-alpha/docs/page-2.html
+http://127.0.0.1:5021/mock-alpha/private/public-note.html
+http://127.0.0.1:5021/mock-alpha/missing.html
+http://127.0.0.1:5021/mock-alpha/redirect-out.html
+http://127.0.0.1:5021/mock-alpha/docs/page-3.html
+http://127.0.0.1:5021/mock-alpha/private/secret.html
+http://127.0.0.1:5021/other/nope.html
+http://example.invalid/mock-alpha/outside.html

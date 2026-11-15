@@ -1,0 +1,4 @@
+# Synthetic robots fixture for mock-gamma.
+User-agent: crawlbudget
+Disallow: /mock-gamma/private/
+Crawl-delay: 0.02

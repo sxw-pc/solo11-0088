@@ -1,0 +1,181 @@
+{
+  "schema_version": "1.0",
+  "run": {
+    "run_id": "demo-run",
+    "status": "completed",
+    "dry_run": false,
+    "started_at": "2026-01-15T00:00:00Z",
+    "finished_at": "2026-01-15T00:00:01Z",
+    "virtual_date": "2026-01-15"
+  },
+  "fingerprints": {
+    "config": "eebb9bbc3e093b880249302d33e6626cd522b8ebfebd53e655ee43e0a49b2f50",
+    "seeds": "2da5a7a22c61ab1ea1797d44bf659528abb455c5852ee10854d3f7d342930bf8",
+    "robots": "756450fe9483d002a312682f4352106575e6a76483b986a8acd53ee49e32071d",
+    "report": "319745f968dc7a4231cfa94dcd26091a87923ad5b930f7a74bb216c96fd4a91d"
+  },
+  "totals": {
+    "sites": 3,
+    "jobs": 3,
+    "planned_requests": 21,
+    "granted_requests": 14,
+    "executed_requests": 14,
+    "http_attempts": 17,
+    "blocked_events": 9,
+    "response_bytes": 3189
+  },
+  "sites": [
+    {
+      "site_id": "mock-alpha",
+      "base_url": "http://127.0.0.1:5021/mock-alpha/",
+      "enabled": true,
+      "daily_quota": 6,
+      "quota_used_before": 0,
+      "max_requests_per_run": 10,
+      "planned_requests": 10,
+      "granted_requests": 6,
+      "executed_requests": 6,
+      "blocked_events": 5,
+      "http_attempts": 6,
+      "response_bytes": 1832,
+      "leases": [
+        {
+          "lease_id": "lease-e7b30fe27e6b7949",
+          "job_id": "job-alpha-main",
+          "granted_requests": 6,
+          "used_requests": 6,
+          "remaining_requests": 0,
+          "expires_at": "2026-01-16T00:00:00Z",
+          "reason": "granted"
+        }
+      ]
+    },
+    {
+      "site_id": "mock-beta",
+      "base_url": "http://127.0.0.1:5022/mock-beta/",
+      "enabled": true,
+      "daily_quota": 10,
+      "quota_used_before": 0,
+      "max_requests_per_run": 10,
+      "planned_requests": 7,
+      "granted_requests": 6,
+      "executed_requests": 6,
+      "blocked_events": 2,
+      "http_attempts": 9,
+      "response_bytes": 1141,
+      "leases": [
+        {
+          "lease_id": "lease-9151a68e609120cf",
+          "job_id": "job-beta-main",
+          "granted_requests": 6,
+          "used_requests": 6,
+          "remaining_requests": 0,
+          "expires_at": "2026-01-16T00:00:00Z",
+          "reason": "granted"
+        }
+      ]
+    },
+    {
+      "site_id": "mock-gamma",
+      "base_url": "http://127.0.0.1:5023/mock-gamma/",
+      "enabled": true,
+      "daily_quota": 10,
+      "quota_used_before": 0,
+      "max_requests_per_run": 2,
+      "planned_requests": 4,
+      "granted_requests": 2,
+      "executed_requests": 2,
+      "blocked_events": 2,
+      "http_attempts": 2,
+      "response_bytes": 216,
+      "leases": [
+        {
+          "lease_id": "lease-7b54871ef063903c",
+          "job_id": "job-gamma-main",
+          "granted_requests": 2,
+          "used_requests": 2,
+          "remaining_requests": 0,
+          "expires_at": "2026-01-16T00:00:00Z",
+          "reason": "granted"
+        }
+      ]
+    }
+  ],
+  "request_status_counts": {
+    "200": 10,
+    "302": 1,
+    "404": 2,
+    "500": 4
+  },
+  "blocked_reason_counts": {
+    "quota_exceeded": 1,
+    "redirect_non_loopback": 1,
+    "response_body_too_large": 1,
+    "robots_disallow": 3,
+    "run_limit_exceeded": 1,
+    "scope_non_loopback": 1,
+    "scope_out_of_site": 1
+  },
+  "top_blocked_reasons": [
+    {
+      "reason": "robots_disallow",
+      "count": 3
+    },
+    {
+      "reason": "quota_exceeded",
+      "count": 1
+    },
+    {
+      "reason": "redirect_non_loopback",
+      "count": 1
+    }
+  ],
+  "robots_matches": [
+    {
+      "site_id": "mock-alpha",
+      "path": "/mock-alpha/private/public-note.html",
+      "decision": "allow",
+      "rule_id": "R002",
+      "pattern": "/mock-alpha/private/public-note.html$",
+      "group_user_agent": "crawlbudget",
+      "reason": "allowed_by_rule"
+    },
+    {
+      "site_id": "mock-alpha",
+      "path": "/mock-alpha/private/secret.html",
+      "decision": "disallow",
+      "rule_id": "R001",
+      "pattern": "/mock-alpha/private/",
+      "group_user_agent": "crawlbudget",
+      "reason": "disallowed_by_rule"
+    },
+    {
+      "site_id": "mock-beta",
+      "path": "/mock-beta/hidden/allowed/note.html",
+      "decision": "allow",
+      "rule_id": "R002",
+      "pattern": "/mock-beta/hidden/allowed/*",
+      "group_user_agent": "crawlbudget",
+      "reason": "allowed_by_rule"
+    },
+    {
+      "site_id": "mock-beta",
+      "path": "/mock-beta/hidden/secret.html",
+      "decision": "disallow",
+      "rule_id": "R001",
+      "pattern": "/mock-beta/hidden/*",
+      "group_user_agent": "crawlbudget",
+      "reason": "disallowed_by_rule"
+    },
+    {
+      "site_id": "mock-gamma",
+      "path": "/mock-gamma/private/hidden.html",
+      "decision": "disallow",
+      "rule_id": "R001",
+      "pattern": "/mock-gamma/private/",
+      "group_user_agent": "crawlbudget",
+      "reason": "disallowed_by_rule"
+    }
+  ],
+  "warnings": []
+}

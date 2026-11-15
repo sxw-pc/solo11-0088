@@ -1,0 +1,8 @@
+# Synthetic robots fixture for mock-alpha.
+User-agent: crawlbudget
+Disallow: /mock-alpha/private/
+Allow: /mock-alpha/private/public-note.html$
+Crawl-delay: 0.01
+
+User-agent: *
+Disallow: /mock-alpha/blocked/

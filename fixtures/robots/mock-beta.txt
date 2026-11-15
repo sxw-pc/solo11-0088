@@ -1,0 +1,8 @@
+# Synthetic robots fixture for mock-beta.
+User-agent: crawlbudget
+Disallow: /mock-beta/hidden/*
+Allow: /mock-beta/hidden/allowed/*
+Crawl-delay: 0.01
+
+User-agent: *
+Disallow: /mock-beta/private/
