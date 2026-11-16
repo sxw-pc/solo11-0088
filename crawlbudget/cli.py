@@ -30,6 +30,7 @@ from .pipeline import (
 )
 from .planner import build_plan
 from .golden import check_golden_from_storage
+from .lease_lifecycle import record_action
 from .review_server import serve_review
 from .storage import Storage
 from .util import parse_utc, virtual_date
@@ -74,6 +75,20 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("--db", default="var/crawlbudget.sqlite3")
     inspect.add_argument("--run-id", help="run id; defaults to latest run")
     inspect.add_argument("--project-root", default=".")
+
+    lease = sub.add_parser("lease-action", help="change a staged run lease before dispatch")
+    lease.add_argument("--config", default="fixtures/demo_sites.yaml")
+    lease.add_argument("--db", default="var/crawlbudget.sqlite3")
+    lease.add_argument("--reports-dir", default="var/reports")
+    lease.add_argument("--project-root", default=".")
+    lease.add_argument("--run-id", required=True)
+    lease.add_argument("--action-id", required=True)
+    lease.add_argument("--kind", choices=("cancel", "transfer", "expire"), required=True)
+    lease.add_argument("--source", required=True,
+                       help="source URL hash, or site id for expire")
+    lease.add_argument("--target", default="", help="target URL hash for transfer")
+    lease.add_argument("--as-of", required=True, help="UTC action time")
+    lease.add_argument("--reason", required=True)
 
     golden = sub.add_parser("check-golden", help="compare a run report with golden fixtures")
     golden.add_argument("--db", default="var/crawlbudget.sqlite3")
@@ -151,6 +166,19 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _inspect_command(args, root)
     if args.command == "check-golden":
         return _golden_command(args, root)
+    if args.command == "lease-action":
+        config = load_config(_path(root, args.config), project_root=root)
+        with Storage(_path(root, args.db)) as storage:
+            action = record_action(
+                config, storage, args.run_id, action_id=args.action_id,
+                kind=args.kind, source_hash=args.source, target_hash=args.target,
+                as_of=args.as_of, reason=args.reason,
+                reports_dir=str(_path(root, args.reports_dir)),
+            )
+            accounting = storage.get_lease_accounting(args.run_id)
+        print(json.dumps({"action": action, "accounting": accounting},
+                         ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
     db_path = _path(root, args.db)
     Storage(db_path).close()
     try:

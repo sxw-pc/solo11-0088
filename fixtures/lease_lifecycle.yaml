@@ -1,0 +1,23 @@
+# Two jobs share a site so grants can be returned or reassigned offline.
+sites:
+  - site_id: lease-demo
+    base_url: http://127.0.0.1:5021/lease-demo/
+    robots_file: robots/lease-demo.txt
+    daily_quota: 2
+    max_requests_per_run: 2
+    max_rps: 20
+    burst: 2
+    crawl_delay_ms: 20
+    max_response_bytes: 4096
+    enabled: true
+jobs:
+  - job_id: priority
+    site_id: lease-demo
+    priority: 1
+    seed_file: seeds/lease-priority.txt
+    enabled: true
+  - job_id: waiting
+    site_id: lease-demo
+    priority: 2
+    seed_file: seeds/lease-waiting.txt
+    enabled: true

@@ -1,0 +1,3 @@
+User-agent: crawlbudget
+Allow: /lease-demo/
+Disallow: /lease-demo/private/

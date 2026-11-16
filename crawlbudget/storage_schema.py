@@ -15,6 +15,20 @@ CREATE TABLE IF NOT EXISTS site_leases (
   expires_at TEXT NOT NULL, reason TEXT NOT NULL,
   PRIMARY KEY (run_id, lease_id)
 );
+CREATE TABLE IF NOT EXISTS lease_actions (
+  action_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, kind TEXT NOT NULL,
+  source_hash TEXT NOT NULL, target_hash TEXT NOT NULL DEFAULT '',
+  as_of TEXT NOT NULL, reason TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS lease_accounting (
+  run_id TEXT NOT NULL, lease_id TEXT NOT NULL, site_id TEXT NOT NULL,
+  job_id TEXT NOT NULL, state TEXT NOT NULL, granted INTEGER NOT NULL,
+  consumed INTEGER NOT NULL, available INTEGER NOT NULL,
+  cancelled INTEGER NOT NULL, transferred_in INTEGER NOT NULL,
+  transferred_out INTEGER NOT NULL, expired INTEGER NOT NULL,
+  settled_at TEXT NOT NULL,
+  PRIMARY KEY (run_id, lease_id)
+);
 CREATE TABLE IF NOT EXISTS planned_requests (
   run_id TEXT NOT NULL, site_id TEXT NOT NULL, job_id TEXT NOT NULL,
   request_order INTEGER NOT NULL, url TEXT NOT NULL, url_hash TEXT NOT NULL,

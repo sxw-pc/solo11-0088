@@ -12,6 +12,7 @@ from typing import Any
 from .config import load_config
 from .demo_site import start_mock_servers, stop_mock_servers
 from .executor import ControlledExecutor
+from .lease_lifecycle import replay_actions, refresh_accounting
 from .models import BlockedEvent, Plan, RunRecord, WarningRecord
 from .planner import build_plan
 from .report import build_summary, persist_report
@@ -64,6 +65,10 @@ def run_pipeline(
         for site_id in sorted(config.sites)
     }
     plan = build_plan(config, run_id, effective_start, prior)
+    completed_hashes = {
+        row["url_hash"] for row in storage.get_planned(run_id) if row["completed"]
+    }
+    replay_actions(plan, storage.get_lease_actions(run_id), completed_hashes)
     planned_finish = _planned_finish(plan)
     if existing:
         _assert_same_fingerprints(existing, config)
@@ -84,6 +89,7 @@ def run_pipeline(
     storage.create_run(run)
     for lease in plan.leases:
         storage.upsert_lease(lease)
+    storage.clear_plan_blocks(run_id)
     for request in plan.requests:
         storage.insert_planned(request)
         if not request.allowed:
@@ -114,6 +120,7 @@ def run_pipeline(
         final_status = "dry_run"
     finished = planned_finish if not dry_run else effective_start
     storage.update_run(run_id, status=final_status, finished_at=finished)
+    refresh_accounting(storage, plan, settled_at=finished)
     run_row = storage.get_run(run_id)
     assert run_row is not None
     summary = build_summary(config, plan, storage, run_row)

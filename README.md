@@ -53,10 +53,21 @@ byte-identical JSON and Markdown reports. `check-golden` exits with
 | `python -m crawlbudget plan` | Print the deterministic plan without making HTTP requests. |
 | `python -m crawlbudget serve --port 8765` | Start the read-only local review console (loopback only). |
 | `python -m crawlbudget inspect-run --run-id ID` | Print the stored run summary as JSON. |
+| `python -m crawlbudget lease-action --run-id ID ...` | Cancel, transfer, or expire a staged lease grant and refresh its accounting. |
 | `python -m crawlbudget check-golden --run-id ID` | Compare the stored report with `fixtures/expected/`. |
 
 Common run options include `--config`, `--db`, `--reports-dir`, `--run-id`,
 `--virtual-start`, and `--dry-run`. Use `--help` on any subcommand for details.
+
+The offline `fixtures/lease_lifecycle.yaml` scenario has two jobs competing for
+two site grants. Stage it with `run --dry-run --config fixtures/lease_lifecycle.yaml`,
+then use `lease-action` with a planned URL hash from `inspect-run`. `cancel`
+returns a grant, `transfer` moves one live grant to an otherwise quota-blocked
+URL in another job on the same site, and `expire` settles unspent grants at the
+lease's UTC boundary. Each action needs a unique ID, UTC `--as-of`, and a
+`--reason`. For `expire`, `--source` is the site ID. Actions are recorded before
+HTTP dispatch, survive replanning of the same run, and produce per-job rows in
+`lease_accounting` alongside the original request ledger.
 
 Exit codes: `0` success, `1` general/storage error, `2` configuration or CLI
 error, `3` golden mismatch, `4` demo-server error, `130` interrupted.

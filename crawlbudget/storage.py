@@ -40,7 +40,8 @@ class Storage:
 
     def reset(self) -> None:
         tables = ("run_reports", "warnings", "blocked_events", "request_events",
-                  "planned_requests", "site_leases", "runs")
+                  "planned_requests", "lease_accounting", "lease_actions",
+                  "site_leases", "runs")
         for table in tables:
             self.conn.execute(f"DROP TABLE IF EXISTS {table}")
         self.conn.commit()
@@ -105,6 +106,51 @@ class Storage:
         return self._all(
             "SELECT * FROM site_leases WHERE run_id=? ORDER BY site_id, job_id", (run_id,)
         )
+
+    def get_lease_actions(self, run_id: str) -> list[dict[str, Any]]:
+        return self._all(
+            "SELECT * FROM lease_actions WHERE run_id=? ORDER BY rowid", (run_id,)
+        )
+
+    def insert_lease_action(self, action: dict[str, str]) -> None:
+        self.conn.execute(
+            """INSERT INTO lease_actions
+               (action_id, run_id, kind, source_hash, target_hash, as_of, reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            tuple(action[key] for key in (
+                "action_id", "run_id", "kind", "source_hash", "target_hash",
+                "as_of", "reason",
+            )),
+        )
+        self.conn.commit()
+
+    def get_lease_accounting(self, run_id: str) -> list[dict[str, Any]]:
+        return self._all(
+            "SELECT * FROM lease_accounting WHERE run_id=? ORDER BY site_id, job_id",
+            (run_id,),
+        )
+
+    def upsert_lease_accounting(self, row: dict[str, Any]) -> None:
+        keys = ("run_id", "lease_id", "site_id", "job_id", "state", "granted",
+                "consumed", "available", "cancelled", "transferred_in",
+                "transferred_out", "expired", "settled_at")
+        self.conn.execute(
+            """INSERT INTO lease_accounting VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(run_id, lease_id) DO UPDATE SET
+                 state=excluded.state, granted=excluded.granted,
+                 consumed=excluded.consumed, available=excluded.available,
+                 cancelled=excluded.cancelled, transferred_in=excluded.transferred_in,
+                 transferred_out=excluded.transferred_out, expired=excluded.expired,
+                 settled_at=excluded.settled_at""",
+            tuple(row[key] for key in keys),
+        )
+        self.conn.commit()
+
+    def clear_plan_blocks(self, run_id: str) -> None:
+        self.conn.execute(
+            "DELETE FROM blocked_events WHERE run_id=? AND stage='plan'", (run_id,)
+        )
+        self.conn.commit()
 
     def insert_planned(self, request: PlannedRequest) -> None:
         self.conn.execute(
