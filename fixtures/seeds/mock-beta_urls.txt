@@ -1,0 +1,8 @@
+# Synthetic seed list for mock-beta. Retry and response-size fixtures included.
+http://127.0.0.1:5022/mock-beta/hidden/secret.html
+http://127.0.0.1:5022/mock-beta/hidden/allowed/note.html
+http://127.0.0.1:5022/mock-beta/public/a.html
+http://127.0.0.1:5022/mock-beta/flaky.html
+http://127.0.0.1:5022/mock-beta/always-fail.html
+http://127.0.0.1:5022/mock-beta/big.html
+http://127.0.0.1:5022/mock-beta/public/b.html

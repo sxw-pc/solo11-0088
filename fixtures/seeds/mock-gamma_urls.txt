@@ -1,0 +1,6 @@
+# Synthetic seed list for mock-gamma. The run limit will block the third
+# eligible URL; the private URL is blocked offline by robots.txt.
+http://127.0.0.1:5023/mock-gamma/public/one.html
+http://127.0.0.1:5023/mock-gamma/public/two.html
+http://127.0.0.1:5023/mock-gamma/public/three.html
+http://127.0.0.1:5023/mock-gamma/private/hidden.html

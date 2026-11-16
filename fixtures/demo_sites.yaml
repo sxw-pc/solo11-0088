@@ -1,0 +1,55 @@
+# Synthetic, loopback-only sites for the crawlbudget demo.
+# All hostnames below are RFC-reserved placeholders.
+sites:
+  - site_id: mock-alpha
+    base_url: http://127.0.0.1:5021/mock-alpha/
+    robots_file: robots/mock-alpha.txt
+    daily_quota: 6
+    max_requests_per_run: 10
+    max_rps: 20
+    burst: 3
+    crawl_delay_ms: 20
+    max_response_bytes: 65536
+    max_retries: 0
+    timeout_ms: 2000
+    enabled: true
+  - site_id: mock-beta
+    base_url: http://127.0.0.1:5022/mock-beta/
+    robots_file: robots/mock-beta.txt
+    daily_quota: 10
+    max_requests_per_run: 10
+    max_rps: 20
+    burst: 3
+    crawl_delay_ms: 20
+    max_response_bytes: 4096
+    max_retries: 2
+    timeout_ms: 2000
+    enabled: true
+  - site_id: mock-gamma
+    base_url: http://127.0.0.1:5023/mock-gamma/
+    robots_file: robots/mock-gamma.txt
+    daily_quota: 10
+    max_requests_per_run: 2
+    max_rps: 10
+    burst: 2
+    crawl_delay_ms: 20
+    max_response_bytes: 4096
+    max_retries: 0
+    timeout_ms: 2000
+    enabled: true
+jobs:
+  - job_id: job-alpha-main
+    site_id: mock-alpha
+    priority: 10
+    seed_file: seeds/mock-alpha_urls.txt
+    enabled: true
+  - job_id: job-beta-main
+    site_id: mock-beta
+    priority: 20
+    seed_file: seeds/mock-beta_urls.txt
+    enabled: true
+  - job_id: job-gamma-main
+    site_id: mock-gamma
+    priority: 30
+    seed_file: seeds/mock-gamma_urls.txt
+    enabled: true

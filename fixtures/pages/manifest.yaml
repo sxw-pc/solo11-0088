@@ -1,0 +1,34 @@
+# Page manifest for the synthetic mock sites. Paths are relative to each
+# site's registered base path. No remote content is referenced.
+mock-alpha:
+  index.html:
+    file: mock-alpha_page_index.html
+  docs/page-1.html:
+    file: mock-alpha_page_docs_1.html
+  docs/page-2.html:
+    file: mock-alpha_page_docs_2.html
+  docs/page-3.html:
+    file: mock-alpha_page_docs_3.html
+  private/public-note.html:
+    file: mock-alpha_page_private_public_note.html
+  redirect-out.html:
+    redirect: http://example.invalid/outside
+mock-beta:
+  hidden/allowed/note.html:
+    file: mock-beta_page_hidden_allowed_note.html
+  public/a.html:
+    file: mock-beta_page_public_a.html
+  public/b.html:
+    file: mock-beta_page_public_b.html
+  flaky.html:
+    file: mock-beta_page_flaky.html
+    fail_first: 1
+  always-fail.html:
+    status: 500
+  big.html:
+    file: mock-beta_page_big.html
+mock-gamma:
+  public/one.html:
+    file: mock-gamma_page_one.html
+  public/three.html:
+    file: mock-gamma_page_three.html
