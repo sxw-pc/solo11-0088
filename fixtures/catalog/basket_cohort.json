@@ -1,0 +1,16 @@
+{
+  "description": "64 independent synthetic daily full offer snapshots of one lamp and one mug",
+  "days": 64,
+  "exception_days": [4, 17],
+  "basket": {"LAMP-A": 1, "MUG-C": 1},
+  "price_ceiling_cents": 4000,
+  "stores": {
+    "mock-alpha": {"LAMP-A": {"price_cents": 3000, "stock": 1}, "MUG-C": {"price_cents": 1200, "stock": 1}},
+    "mock-beta": {"LAMP-A": {"price_cents": 2800, "stock": 1}, "MUG-C": {"price_cents": 1500, "stock": 1}},
+    "mock-gamma": {"LAMP-A": {"price_cents": 3200, "stock": 1}, "MUG-C": {"price_cents": 900, "stock": 1}}
+  },
+  "stock_overrides_on_exception_days": {
+    "mock-beta": {"LAMP-A": 0},
+    "mock-gamma": {"MUG-C": 0}
+  }
+}
