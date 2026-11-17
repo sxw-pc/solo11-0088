@@ -1,0 +1,39 @@
+{
+  "frame_path": "fixtures/quality/frame.json",
+  "schema_fields": [
+    "title",
+    "owner",
+    "updated",
+    "license"
+  ],
+  "core_fields": [
+    "title",
+    "owner",
+    "updated"
+  ],
+  "body_paths": {
+    "http://127.0.0.1:5021/lease-demo/b.html": "fixtures/document_completeness/b.html",
+    "http://127.0.0.1:5021/lease-demo/d.html": "fixtures/document_completeness/d.html",
+    "http://127.0.0.1:5021/lease-demo/e.html": "fixtures/document_completeness/e.html",
+    "http://127.0.0.1:5021/lease-demo/f.html": "fixtures/document_completeness/f.html"
+  },
+  "contracts": {
+    "full_metadata": {
+      "required_fields": [
+        "title",
+        "owner",
+        "updated",
+        "license"
+      ],
+      "minimum_population_fraction": "3/4"
+    },
+    "public_index": {
+      "required_fields": [
+        "title",
+        "owner",
+        "updated"
+      ],
+      "minimum_population_fraction": "3/4"
+    }
+  }
+}
