@@ -32,6 +32,7 @@ from .planner import build_plan
 from .golden import check_golden_from_storage
 from .review_server import serve_review
 from .storage import Storage
+from .catalog_offers import extract_offers
 from .util import parse_utc, virtual_date
 
 LOG = logging.getLogger("crawlbudget")
@@ -80,6 +81,13 @@ def build_parser() -> argparse.ArgumentParser:
     golden.add_argument("--run-id", help="run id; defaults to latest run")
     golden.add_argument("--expected-dir", default="fixtures/expected")
     golden.add_argument("--project-root", default=".")
+    catalog = sub.add_parser("catalog-offers", help="extract offline offers from a captured page")
+    catalog.add_argument("--db", default="var/crawlbudget.sqlite3")
+    catalog.add_argument("--run-id", required=True)
+    catalog.add_argument("--site-id", required=True)
+    catalog.add_argument("--url-hash", required=True)
+    catalog.add_argument("--body-file", required=True)
+    catalog.add_argument("--project-root", default=".")
     return parser
 
 
@@ -151,6 +159,17 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _inspect_command(args, root)
     if args.command == "check-golden":
         return _golden_command(args, root)
+    if args.command == "catalog-offers":
+        with Storage(_path(root, args.db)) as storage:
+            events = storage.get_request_events(
+                args.run_id, site_id=args.site_id, url_hash=args.url_hash
+            )
+        if not events:
+            raise CliError("capture event not found")
+        event = max(events, key=lambda row: (row["attempt"], row["event_id"]))
+        payload = extract_offers(_path(root, args.body_file).read_bytes(), event)
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+        return 0
     db_path = _path(root, args.db)
     Storage(db_path).close()
     try:
