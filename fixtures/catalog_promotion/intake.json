@@ -1,0 +1,89 @@
+{
+  "source_page_path": "fixtures/catalog/day-one.html",
+  "source_site": "mock-alpha",
+  "source_body_sha256": "a4e809f5dd68d78d83c2911268c6500ff5be5f86a389d25959b5b0e200bc71c8",
+  "carts": [
+    {
+      "cart_id": "cart-1",
+      "items": {
+        "LAMP-A": 1,
+        "MUG-C": 1
+      },
+      "merchant_cost_cents": 3200
+    },
+    {
+      "cart_id": "cart-2",
+      "items": {
+        "LAMP-A": 1
+      },
+      "merchant_cost_cents": 2000
+    },
+    {
+      "cart_id": "cart-3",
+      "items": {
+        "MUG-C": 2
+      },
+      "merchant_cost_cents": 1600
+    }
+  ],
+  "offers": [
+    {
+      "offer_id": "A",
+      "cart_id": "cart-1",
+      "discount_cents": 1000,
+      "uplift_points": 11,
+      "vendor_eligible": true
+    },
+    {
+      "offer_id": "B",
+      "cart_id": "cart-1",
+      "discount_cents": 500,
+      "uplift_points": 5,
+      "vendor_eligible": false
+    },
+    {
+      "offer_id": "C",
+      "cart_id": "cart-2",
+      "discount_cents": 800,
+      "uplift_points": 8,
+      "vendor_eligible": false
+    },
+    {
+      "offer_id": "D",
+      "cart_id": "cart-2",
+      "discount_cents": 500,
+      "uplift_points": 4,
+      "vendor_eligible": false
+    },
+    {
+      "offer_id": "E",
+      "cart_id": "cart-3",
+      "discount_cents": 700,
+      "uplift_points": 10,
+      "vendor_eligible": true
+    },
+    {
+      "offer_id": "F",
+      "cart_id": "cart-3",
+      "discount_cents": 300,
+      "uplift_points": 6,
+      "vendor_eligible": false
+    }
+  ],
+  "shipping": {
+    "free_threshold_cents": 4000,
+    "fee_cents": 600,
+    "merchant_cost_cents": 400
+  },
+  "minimum_merchant_contribution_cents": 300,
+  "contracts": {
+    "merchant_pays": {
+      "merchant_cap_cents": 1300,
+      "vendor_cap_cents": 0
+    },
+    "vendor_eligible": {
+      "merchant_cap_cents": 800,
+      "vendor_cap_cents": 1000
+    }
+  }
+}
