@@ -1,0 +1,60 @@
+{
+  "depot": "D",
+  "session_capacity": 2,
+  "subscribers": [
+    {
+      "subscriber_id": "subscriber-A",
+      "site_id": "mock-alpha",
+      "stop": "A",
+      "page_path": "fixtures/pages/mock-alpha_page_docs_1.html",
+      "body_bytes": 511,
+      "body_sha256": "32c0236556771de5f47e15ba87c1800992dc5a7cea1cd26da0664cc895e870bd"
+    },
+    {
+      "subscriber_id": "subscriber-B",
+      "site_id": "mock-beta",
+      "stop": "B",
+      "page_path": "fixtures/pages/mock-beta_page_public_a.html",
+      "body_bytes": 262,
+      "body_sha256": "4ae2ebc60a4f9064d915e14f76e3f5e2164bcf218170639b710230867f3d518b"
+    },
+    {
+      "subscriber_id": "subscriber-C",
+      "site_id": "mock-gamma",
+      "stop": "C",
+      "page_path": "fixtures/pages/mock-gamma_page_one.html",
+      "body_bytes": 216,
+      "body_sha256": "c83fc7a51eb6bf203804469ba1974bfb335463e91a2f03cf72622e70ebedac66"
+    }
+  ],
+  "navigation_cost": {
+    "D": {
+      "A": 10,
+      "B": 9,
+      "C": 8
+    },
+    "A": {
+      "D": 10,
+      "B": 2,
+      "C": 5
+    },
+    "B": {
+      "D": 9,
+      "A": 2,
+      "C": 6
+    },
+    "C": {
+      "D": 8,
+      "A": 5,
+      "B": 6
+    }
+  },
+  "contracts": {
+    "byte_share": {
+      "charge_rule": "body_bytes_proportional"
+    },
+    "marginal_share": {
+      "charge_rule": "session_coalition_shapley"
+    }
+  }
+}
