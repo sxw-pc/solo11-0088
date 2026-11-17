@@ -32,3 +32,17 @@ mock-gamma:
     file: mock-gamma_page_one.html
   public/three.html:
     file: mock-gamma_page_three.html
+lease-demo:
+  a.html:
+    file: mock-alpha_page_index.html
+  b.html:
+    file: mock-alpha_page_docs_1.html
+  c.html:
+    file: mock-alpha_page_docs_2.html
+  d.html:
+    file: mock-alpha_page_docs_3.html
+  e.html:
+    file: mock-beta_page_flaky.html
+    fail_first: 1
+  f.html:
+    file: mock-gamma_page_one.html

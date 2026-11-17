@@ -29,6 +29,7 @@ from .pipeline import (
     run_pipeline,
 )
 from .planner import build_plan
+from .quality_sampling import audit_sample, load_frame
 from .golden import check_golden_from_storage
 from .lease_lifecycle import record_action
 from .review_server import serve_review
@@ -89,6 +90,13 @@ def build_parser() -> argparse.ArgumentParser:
     lease.add_argument("--target", default="", help="target URL hash for transfer")
     lease.add_argument("--as-of", required=True, help="UTC action time")
     lease.add_argument("--reason", required=True)
+
+    quality = sub.add_parser("quality-audit", help="inspect an offline URL sample")
+    quality.add_argument("--config", required=True)
+    quality.add_argument("--frame", required=True)
+    quality.add_argument("--db", default="var/crawlbudget.sqlite3")
+    quality.add_argument("--project-root", default=".")
+    quality.add_argument("--run-id", required=True)
 
     golden = sub.add_parser("check-golden", help="compare a run report with golden fixtures")
     golden.add_argument("--db", default="var/crawlbudget.sqlite3")
@@ -178,6 +186,18 @@ def _dispatch(args: argparse.Namespace) -> int:
             accounting = storage.get_lease_accounting(args.run_id)
         print(json.dumps({"action": action, "accounting": accounting},
                          ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+    if args.command == "quality-audit":
+        config = load_config(_path(root, args.config), project_root=root)
+        frame_path = _path(root, args.frame)
+        # A frame declares its site; the loader verifies every URL against that site.
+        raw_frame = json.loads(frame_path.read_text(encoding="utf-8"))
+        if not isinstance(raw_frame, dict) or raw_frame.get("site_id") not in config.sites:
+            raise ValueError("sample frame site is not registered")
+        frame = load_frame(frame_path, config.sites[raw_frame["site_id"]])
+        with Storage(_path(root, args.db)) as storage:
+            result = audit_sample(storage, args.run_id, frame)
+        print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
     db_path = _path(root, args.db)
     Storage(db_path).close()

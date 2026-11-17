@@ -69,6 +69,20 @@ lease's UTC boundary. Each action needs a unique ID, UTC `--as-of`, and a
 HTTP dispatch, survive replanning of the same run, and produce per-job rows in
 `lease_accounting` alongside the original request ledger.
 
+The offline `quality-audit` entrance reads a fixed URL sampling frame and one
+stored run. `fixtures/quality/frame.json` contains six in-scope URLs; its seed
+draws four without replacement into `fixtures/seeds/quality-sample.txt`. The
+local mock fixture lets `e.html` return one transient 500 before a 200. The
+audit shows first-attempt and eventual observed outcomes per selected URL. It
+does not turn the four observations into a population reliability rating.
+
+```bash
+python -m crawlbudget run --config fixtures/quality_sampling.yaml \
+  --run-id quality-sample
+python -m crawlbudget quality-audit --config fixtures/quality_sampling.yaml \
+  --frame fixtures/quality/frame.json --run-id quality-sample
+```
+
 Exit codes: `0` success, `1` general/storage error, `2` configuration or CLI
 error, `3` golden mismatch, `4` demo-server error, `130` interrupted.
 

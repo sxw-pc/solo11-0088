@@ -1,0 +1,13 @@
+{
+  "site_id": "lease-demo",
+  "seed": "quality-audit-1",
+  "sample_size": 4,
+  "urls": [
+    "http://127.0.0.1:5021/lease-demo/a.html",
+    "http://127.0.0.1:5021/lease-demo/b.html",
+    "http://127.0.0.1:5021/lease-demo/c.html",
+    "http://127.0.0.1:5021/lease-demo/d.html",
+    "http://127.0.0.1:5021/lease-demo/e.html",
+    "http://127.0.0.1:5021/lease-demo/f.html"
+  ]
+}
