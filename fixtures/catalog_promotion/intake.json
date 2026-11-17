@@ -38,35 +38,35 @@
       "offer_id": "B",
       "cart_id": "cart-1",
       "discount_cents": 500,
-      "uplift_points": 5,
+      "uplift_points": 4,
       "vendor_eligible": false
     },
     {
       "offer_id": "C",
       "cart_id": "cart-2",
       "discount_cents": 800,
-      "uplift_points": 8,
+      "uplift_points": 9,
       "vendor_eligible": false
     },
     {
       "offer_id": "D",
       "cart_id": "cart-2",
       "discount_cents": 500,
-      "uplift_points": 4,
+      "uplift_points": 2,
       "vendor_eligible": false
     },
     {
       "offer_id": "E",
       "cart_id": "cart-3",
       "discount_cents": 700,
-      "uplift_points": 10,
+      "uplift_points": 8,
       "vendor_eligible": true
     },
     {
       "offer_id": "F",
       "cart_id": "cart-3",
       "discount_cents": 300,
-      "uplift_points": 6,
+      "uplift_points": 5,
       "vendor_eligible": false
     }
   ],
