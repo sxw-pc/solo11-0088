@@ -1,0 +1,19 @@
+sites:
+  - site_id: mock-landing
+    base_url: http://127.0.0.1:5025/mock-landing/
+    robots_file: fixtures/landing_rights/robots.txt
+    daily_quota: 6
+    max_requests_per_run: 6
+    max_rps: 20
+    burst: 3
+    crawl_delay_ms: 10
+    max_response_bytes: 4096
+    max_retries: 0
+    timeout_ms: 2000
+    enabled: true
+jobs:
+  - job_id: landing-rights
+    site_id: mock-landing
+    priority: 10
+    seed_file: fixtures/landing_rights/seeds.txt
+    enabled: true

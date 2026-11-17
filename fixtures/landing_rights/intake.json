@@ -1,0 +1,77 @@
+{
+  "source_url": "http://127.0.0.1:5025/mock-landing/landing.html",
+  "rights": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "possible_worlds": [
+    {
+      "world_id": "w1",
+      "invalid_rights": [
+        "B",
+        "E"
+      ],
+      "prior_weight": 5
+    },
+    {
+      "world_id": "w2",
+      "invalid_rights": [
+        "A",
+        "B",
+        "C"
+      ],
+      "prior_weight": 12
+    },
+    {
+      "world_id": "w3",
+      "invalid_rights": [
+        "C",
+        "D",
+        "E"
+      ],
+      "prior_weight": 1
+    },
+    {
+      "world_id": "w4",
+      "invalid_rights": [
+        "A",
+        "D"
+      ],
+      "prior_weight": 13
+    },
+    {
+      "world_id": "w5",
+      "invalid_rights": [
+        "A",
+        "C",
+        "D"
+      ],
+      "prior_weight": 3
+    },
+    {
+      "world_id": "w6",
+      "invalid_rights": [],
+      "prior_weight": 15
+    },
+    {
+      "world_id": "w7",
+      "invalid_rights": [
+        "A",
+        "D",
+        "E"
+      ],
+      "prior_weight": 8
+    }
+  ],
+  "contracts": {
+    "worst_safe_reach": {
+      "minimum_value": 7
+    },
+    "expected_safe_reach": {
+      "minimum_value": "14"
+    }
+  }
+}
