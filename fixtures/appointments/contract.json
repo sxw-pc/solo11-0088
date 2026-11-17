@@ -1,0 +1,1 @@
+{"contract_id":"booking-2025-p1","source_url":"http://127.0.0.1:5024/mock-appointments/slots.html","provider_id":"provider-p1","slot_id":"slot-s1","cadences":["same_local_hour","fixed_168h"],"gap_rule":"skip","first_local":"2025-03-02T02:30:00","time_zone":"America/New_York","weekly_count":4}
