@@ -32,6 +32,7 @@ from .planner import build_plan
 from .golden import check_golden_from_storage
 from .review_server import serve_review
 from .storage import Storage
+from .change_monitor import build_change_monitor
 from .util import parse_utc, virtual_date
 
 LOG = logging.getLogger("crawlbudget")
@@ -80,6 +81,10 @@ def build_parser() -> argparse.ArgumentParser:
     golden.add_argument("--run-id", help="run id; defaults to latest run")
     golden.add_argument("--expected-dir", default="fixtures/expected")
     golden.add_argument("--project-root", default=".")
+    changes = sub.add_parser("change-monitor", help="compare captured page bodies across runs")
+    changes.add_argument("--db", default="var/crawlbudget.sqlite3")
+    changes.add_argument("--run-id", action="append", required=True)
+    changes.add_argument("--project-root", default=".")
     return parser
 
 
@@ -151,6 +156,11 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _inspect_command(args, root)
     if args.command == "check-golden":
         return _golden_command(args, root)
+    if args.command == "change-monitor":
+        with Storage(_path(root, args.db)) as storage:
+            payload = build_change_monitor(storage, args.run_id)
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+        return 0
     db_path = _path(root, args.db)
     Storage(db_path).close()
     try:

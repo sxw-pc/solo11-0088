@@ -1,0 +1,17 @@
+{
+  "runs": [
+    {"run_id":"watch-01","virtual_date":"2026-01-01","events":[
+      {"site_id":"mock-alpha","url_hash":"page-a","url":"http://127.0.0.1:5021/mock-alpha/index.html","attempt":1,"outcome":"success","body_sha256":"aaa"},
+      {"site_id":"mock-alpha","url_hash":"page-b","url":"http://127.0.0.1:5021/mock-alpha/docs/page-1.html","attempt":1,"outcome":"success","body_sha256":"bbb"}
+    ]},
+    {"run_id":"watch-02","virtual_date":"2026-01-02","events":[
+      {"site_id":"mock-alpha","url_hash":"page-a","url":"http://127.0.0.1:5021/mock-alpha/index.html","attempt":1,"outcome":"retryable_error","body_sha256":""},
+      {"site_id":"mock-alpha","url_hash":"page-a","url":"http://127.0.0.1:5021/mock-alpha/index.html","attempt":2,"outcome":"transport_error_final","body_sha256":""},
+      {"site_id":"mock-alpha","url_hash":"page-b","url":"http://127.0.0.1:5021/mock-alpha/docs/page-1.html","attempt":1,"outcome":"success","body_sha256":"bbb"}
+    ]},
+    {"run_id":"watch-03","virtual_date":"2026-01-03","events":[
+      {"site_id":"mock-alpha","url_hash":"page-a","url":"http://127.0.0.1:5021/mock-alpha/index.html","attempt":1,"outcome":"success","body_sha256":"ccc"},
+      {"site_id":"mock-alpha","url_hash":"page-b","url":"http://127.0.0.1:5021/mock-alpha/docs/page-1.html","attempt":1,"outcome":"success","body_sha256":"bbb"}
+    ]}
+  ]
+}
