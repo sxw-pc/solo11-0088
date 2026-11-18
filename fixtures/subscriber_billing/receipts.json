@@ -1,0 +1,58 @@
+{
+  "source": "crawlbudget.executor success GET ledger snapshot",
+  "source_run_id": "billing-receipts",
+  "note": "Recorded from a deterministic offline replay of fixtures/demo_sites.yaml; billing re-verifies every field against local fixture bytes, scope, robots, and lease grants.",
+  "receipts": [
+    {
+      "subscriber_id": "subscriber-A",
+      "site_id": "mock-alpha",
+      "url": "http://127.0.0.1:5021/mock-alpha/docs/page-1.html",
+      "url_hash": "0c86fc8d4c72410865a613751168aa2c79bc2974027634e28b8311a4549eccec",
+      "run_id": "billing-receipts",
+      "outcome": "success",
+      "status_code": 200,
+      "response_bytes": 511,
+      "body_sha256": "32c0236556771de5f47e15ba87c1800992dc5a7cea1cd26da0664cc895e870bd",
+      "planned_allowed": true,
+      "block_reason": null,
+      "robots_decision": "allow",
+      "lease_id": "lease-83433ba97e3f264f",
+      "lease_granted": 6,
+      "lease_used": 6
+    },
+    {
+      "subscriber_id": "subscriber-B",
+      "site_id": "mock-beta",
+      "url": "http://127.0.0.1:5022/mock-beta/public/a.html",
+      "url_hash": "51b5d30a7d716df8fe49cd6b9324e7385a7d01d9763064e11a53b1e9f2f1c73f",
+      "run_id": "billing-receipts",
+      "outcome": "success",
+      "status_code": 200,
+      "response_bytes": 262,
+      "body_sha256": "4ae2ebc60a4f9064d915e14f76e3f5e2164bcf218170639b710230867f3d518b",
+      "planned_allowed": true,
+      "block_reason": null,
+      "robots_decision": "allow",
+      "lease_id": "lease-0447c002b80dc500",
+      "lease_granted": 6,
+      "lease_used": 6
+    },
+    {
+      "subscriber_id": "subscriber-C",
+      "site_id": "mock-gamma",
+      "url": "http://127.0.0.1:5023/mock-gamma/public/one.html",
+      "url_hash": "297c105534ddabb609fa0cf3d1eaa2cadc4a20b09a2fab29adae6943bfaa1921",
+      "run_id": "billing-receipts",
+      "outcome": "success",
+      "status_code": 200,
+      "response_bytes": 216,
+      "body_sha256": "c83fc7a51eb6bf203804469ba1974bfb335463e91a2f03cf72622e70ebedac66",
+      "planned_allowed": true,
+      "block_reason": null,
+      "robots_decision": "allow",
+      "lease_id": "lease-8e3c9cca5234a6c7",
+      "lease_granted": 2,
+      "lease_used": 2
+    }
+  ]
+}

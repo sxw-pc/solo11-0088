@@ -31,6 +31,16 @@ pytest -q tests/test_golden.py
 | CLI/integration | `test_cli_demo.py` | Real loopback mock servers on ephemeral ports, demo idempotency, plan, inspect, config exit code, golden mismatch, dry run. |
 | Safety | `test_safety.py` | `trust_env=False`, fixture-local-only resources, mock prefix routing, loopback redirect blocked, read-only console and loopback bind. |
 | Golden | `test_golden.py` | Fixture equality, field-level old/new differences, missing fixture error, CLI success, no absolute paths/local time, type mismatch. |
+| Billing | `test_subscriber_billing.py`, `test_subscriber_receipts.py` | Exact subset costs and re-routing, capacity bounds, both contracts and cent rounding, refusal, receipt attestation, ledger receipts, CLI. |
+
+Billing tests are fully offline. They read `fixtures/subscriber_billing/intake.json`
+and the recorded executor snapshot `fixtures/subscriber_billing/receipts.json`;
+`test_executor_ledger_is_a_valid_receipt_source` rebuilds the receipt set from a
+replayed in-memory ledger instead. Run them with:
+
+```bash
+python -m crawlbudget.subscriber_billing --fixture fixtures/subscriber_billing/intake.json
+```
 
 ## 3. Deterministic fixtures
 

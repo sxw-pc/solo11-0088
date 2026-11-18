@@ -157,6 +157,38 @@ The report fingerprint is the SHA-256 of the canonical summary with the report
 fingerprint field blank. Golden comparison reports old and new values per JSON
 path and the first differing Markdown line.
 
+## Subscriber billing (downstream settlement)
+
+`crawlbudget.subscriber_billing` settles synthetic subscribers that share
+collection sessions. It is a downstream step: it never issues a GET, never
+re-authorizes a request, and never changes lease usage.
+
+```bash
+python -m crawlbudget.subscriber_billing --fixture fixtures/subscriber_billing/intake.json
+```
+
+- `billing_inputs.py` validates the intake, including the 6-subscriber and
+  capacity-3 bounds, duplicate ids, and non-negative directed navigation costs.
+- `billing_model.py` computes the exact minimum cost `c(S)` for **every**
+  subscriber subset by exhaustive session-partition and directed-route search;
+  subset costs are never derived by deleting a stop from the full route.
+- `billing_receipts.py` reads executor success events and `billing_verify.py`
+  turns each into a billable weight only after re-checking the 2xx success, the
+  recorded `response_bytes`/`body_sha256`, the local fixture bytes, the mapped
+  page URL, scope, robots, and a granted-and-consumed lease.
+- `billing_contracts.py` signs two independent contracts: `byte_share` (floor to
+  the cent, then largest fractional remainder, ties by `subscriber_id`) and
+  `marginal_share` (exact Shapley value over re-solved subset costs). Both must
+  be non-negative, at or below each solo price, and sum exactly to `c(all)`;
+  otherwise the contract refuses instead of trimming a bill.
+
+For the shipped fixture, `c(A)=20`, `c(B)=18`, `c(C)=16`, `c(AB)=21`,
+`c(AC)=c(BC)=23`, `c(ABC)=37`. The optimal full plan is `D->A->B->D` (21) plus
+`D->C->D` (16). `byte_share` bills 19.12 / 9.80 / 8.08; `marginal_share` bills
+13 / 12 / 12. The report includes every subset plan, receipt identities, and
+refusal evidence. The CLI exits `2` and prints `REFUSED ...` when delivery or a
+contract cannot be attested.
+
 ## Project layout
 
 ```text
