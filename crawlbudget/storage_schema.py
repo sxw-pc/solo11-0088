@@ -59,6 +59,14 @@ CREATE TABLE IF NOT EXISTS warnings (
   code TEXT NOT NULL, message TEXT NOT NULL, context_json TEXT NOT NULL,
   recorded_at TEXT NOT NULL, UNIQUE (run_id, code, message, context_json)
 );
+CREATE TABLE IF NOT EXISTS quality_commitments (
+  run_id TEXT PRIMARY KEY, commitment_digest TEXT NOT NULL,
+  schema_version TEXT NOT NULL, quality_version TEXT NOT NULL,
+  version_digest TEXT NOT NULL, frame_digest TEXT NOT NULL,
+  selected_digest TEXT NOT NULL, contracts_digest TEXT NOT NULL,
+  frame_json TEXT NOT NULL, selected_json TEXT NOT NULL,
+  contracts_json TEXT NOT NULL, created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS run_reports (
   run_id TEXT PRIMARY KEY, summary_json TEXT NOT NULL, summary_md TEXT NOT NULL,
   summary_html TEXT NOT NULL, report_fingerprint TEXT NOT NULL, created_at TEXT NOT NULL

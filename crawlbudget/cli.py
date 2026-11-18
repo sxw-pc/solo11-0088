@@ -30,6 +30,7 @@ from .pipeline import (
 )
 from .planner import build_plan
 from .quality_sampling import audit_sample, load_frame
+from .document_completeness import inspect_documents, load_intake
 from .golden import check_golden_from_storage
 from .lease_lifecycle import record_action
 from .review_server import serve_review
@@ -60,6 +61,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--virtual-start", default=DEFAULT_VIRTUAL_START)
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--no-mock", action="store_true", help="do not start built-in mock sites")
+    run.add_argument("--quality-intake",
+                     help="intake JSON whose frame and contracts are committed before any GET")
 
     plan = sub.add_parser("plan", help="print a deterministic plan without executing")
     _common(plan)
@@ -93,10 +96,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     quality = sub.add_parser("quality-audit", help="inspect an offline URL sample")
     quality.add_argument("--config", required=True)
-    quality.add_argument("--frame", required=True)
+    quality.add_argument("--frame", help="sampling frame; defaults to the intake's frame_path")
     quality.add_argument("--db", default="var/crawlbudget.sqlite3")
     quality.add_argument("--project-root", default=".")
     quality.add_argument("--run-id", required=True)
+    quality.add_argument("--intake",
+                         help="captured-document intake; enables population certification")
 
     golden = sub.add_parser("check-golden", help="compare a run report with golden fixtures")
     golden.add_argument("--db", default="var/crawlbudget.sqlite3")
@@ -189,14 +194,23 @@ def _dispatch(args: argparse.Namespace) -> int:
         return 0
     if args.command == "quality-audit":
         config = load_config(_path(root, args.config), project_root=root)
-        frame_path = _path(root, args.frame)
+        intake = load_intake(_path(root, args.intake)) if args.intake else None
+        frame_ref = args.frame or (intake or {}).get("frame_path")
+        if not frame_ref:
+            raise ValueError("quality audit requires --frame or an intake frame_path")
+        frame_path = _path(root, frame_ref)
         # A frame declares its site; the loader verifies every URL against that site.
         raw_frame = json.loads(frame_path.read_text(encoding="utf-8"))
         if not isinstance(raw_frame, dict) or raw_frame.get("site_id") not in config.sites:
             raise ValueError("sample frame site is not registered")
         frame = load_frame(frame_path, config.sites[raw_frame["site_id"]])
         with Storage(_path(root, args.db)) as storage:
-            result = audit_sample(storage, args.run_id, frame)
+            if intake is not None:
+                result = inspect_documents(
+                    storage, args.run_id, frame, _path(root, args.intake)
+                )
+            else:
+                result = audit_sample(storage, args.run_id, frame)
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
     db_path = _path(root, args.db)
@@ -210,6 +224,9 @@ def _dispatch(args: argparse.Namespace) -> int:
 
 def _run_command(args, config_path, db_path, reports, pages, manifest, root) -> Any:
     config = load_config(config_path, project_root=root)
+    frame = contracts = None
+    if args.quality_intake:
+        frame, contracts = _quality_inputs(root, config, args.quality_intake)
     with Storage(db_path) as storage:
         servers = []
         try:
@@ -222,9 +239,23 @@ def _run_command(args, config_path, db_path, reports, pages, manifest, root) -> 
                 virtual_start=args.virtual_start,
                 reports_dir=reports,
                 dry_run=args.dry_run,
+                quality_frame=frame,
+                quality_contracts=contracts,
             )
         finally:
             stop_mock_servers(servers)
+
+
+def _quality_inputs(root: Path, config, intake_path: str) -> tuple[dict, dict]:
+    intake = load_intake(_path(root, intake_path))
+    if not intake["frame_path"]:
+        raise ValueError("quality intake must name its sampling frame")
+    frame_path = _path(root, intake["frame_path"])
+    raw_frame = json.loads(frame_path.read_text(encoding="utf-8"))
+    if not isinstance(raw_frame, dict) or raw_frame.get("site_id") not in config.sites:
+        raise ValueError("sample frame site is not registered")
+    frame = load_frame(frame_path, config.sites[raw_frame["site_id"]])
+    return frame, intake["contracts"]
 
 
 def _plan_command(args: argparse.Namespace, root: Path) -> int:

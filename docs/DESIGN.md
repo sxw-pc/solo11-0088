@@ -60,6 +60,10 @@ YAML config ──> validation ──> scope + robots + budget planner ──> l
 | `storage.py` / `storage_schema.py` | SQLite ledger, idempotent writes, queries. |
 | `executor.py` | Guarded HTTP execution, revalidation, retries, body caps. |
 | `pipeline.py` | End-to-end orchestration, resume, reset, inspect. |
+| `quality_sampling.py` | Pre-execution frame/contract/version commitment and observed attempt audit. |
+| `quality_stats.py` | Exact hypergeometric tail and one-sided population lower bound. |
+| `metadata_fields.py` | Unique non-empty `<meta name=...>` extraction from one captured body. |
+| `document_completeness.py` | Receipt matching, per-field eligibility, sign/refuse certificates. |
 | `report.py` | Summary construction, report persistence. |
 | `report_render.py` | Stable Markdown and self-contained HTML rendering. |
 | `golden.py` | Field-level and Markdown golden comparison. |
@@ -163,6 +167,16 @@ Primary key `run_id`; stores JSON, Markdown, and HTML report bodies, the report
 fingerprint, and creation time. Persisting a report also updates the run row's
 report fingerprint.
 
+### `quality_commitments`
+
+Primary key `run_id`. Persists the frame (all URLs, seed, sample size), the drawn
+sample, the normalized contracts, one code-version digest, and a commitment
+digest over all of them. It is written after planning but before any HTTP
+attempt, so later inspection cannot re-seed, re-draw, swap a contract, or
+substitute another version. Repeating the identical commitment is idempotent;
+any difference is rejected, and a commitment cannot be created once the run has
+recorded request events.
+
 Foreign-key enforcement is enabled; WAL mode is used for file databases and
 memory mode for `:memory:`. Runtime directories are created automatically.
 
@@ -233,7 +247,44 @@ same section data and inline CSS; it references no scripts, fonts, or images.
 `check-golden` compares the summary recursively and then the Markdown text. It
 returns per-field old/new values, making drift actionable.
 
-## 10. Extending the system
+## 10. Population metadata certification
+
+The document-quality path is a procurement acceptance gate, not a descriptive
+sample report. Its ordering is the guarantee:
+
+1. Before any sampled `GET`, `run` commits the entire sampling frame, the seed,
+   the drawn sample, every declared contract, and a code-version digest to the
+   run. Planning is offline; the commitment is durable before dispatch.
+2. After execution, each committed URL is judged against exactly one successful
+   `text/html` event for that same URL whose `body_sha256` and byte count equal
+   the captured body. Failed, missing, multiple, or mismatched receipts are
+   unqualified. No replacement URL is drawn.
+3. For each contract, a URL is qualified only if every `required_fields` entry
+   has exactly one non-empty `<meta name=...>` value in that URL's own body.
+   Retries count once. Duplicate and empty fields fail. Values are never taken
+   from another page.
+4. With population `N` (all frame URLs), sample `n`, and qualified count `x`,
+   the exact hypergeometric upper tail `P(X >= x | K)` is evaluated for each
+   candidate population count `K`. Candidates with tail `<= alpha` (default
+   `1/10`) are rejected; the smallest surviving `K` is the one-sided lower
+   bound.
+5. The certificate is signed only when `K/N` is at least the contract's
+   `minimum_population_fraction`. Otherwise it is refused with
+   `insufficient_evidence` (or `no_qualified_sample` when `x` is zero). The
+   observed `x/n` is recorded with `is_population_estimate: false` and is never
+   substituted for the population bound.
+6. Inspection re-verifies the stored commitment against the supplied frame,
+   contracts, and digest. A changed seed, reordered frame, swapped contract, or
+   altered commitment digest is rejected.
+
+The same captured bodies can produce different decisions under different
+contracts. In the shipped fixture, `full_metadata` (requires `license`) has
+`x=3`, lower bound `3/6`, and is refused against a `3/4` minimum, while
+`public_index` (no `license`) has `x=4`, lower bound `5/6`, and is signed. All
+tails and bounds use integer combinations; frames are capped at 30 URLs and
+samples at 12, so this is exact and offline.
+
+## 11. Extending the system
 
 Appropriate extensions preserve the safety model:
 

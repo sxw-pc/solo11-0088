@@ -15,6 +15,7 @@ from .executor import ControlledExecutor
 from .lease_lifecycle import replay_actions, refresh_accounting
 from .models import BlockedEvent, Plan, RunRecord, WarningRecord
 from .planner import build_plan
+from .quality_sampling import commit_quality_sample
 from .report import build_summary, persist_report
 from .storage import Storage
 from .util import iso_z, parse_utc, virtual_date
@@ -56,9 +57,15 @@ def run_pipeline(
     dry_run: bool = False,
     session: Any | None = None,
     sleeper=None,
+    quality_frame: dict[str, Any] | None = None,
+    quality_contracts: dict[str, Any] | None = None,
 ) -> ExecutionResult:
     existing = storage.get_run(run_id)
     effective_start = existing["started_at"] if existing else virtual_start
+    if quality_frame is None and quality_contracts is not None:
+        raise ValueError("quality contracts require a quality frame")
+    if quality_frame is not None and quality_contracts is None:
+        raise ValueError("quality frame requires pre-declared metadata contracts")
     day = virtual_date(parse_utc(effective_start))
     prior = {
         site_id: storage.daily_quota_used(site_id, day, exclude_run_id=run_id)
@@ -106,6 +113,14 @@ def run_pipeline(
             context=dict(warning.get("context", {})), recorded_at=effective_start,
         ))
     stats: dict[str, int] = {}
+    if quality_frame is not None and quality_contracts is not None:
+        # Planning and ledger writes perform no HTTP.  Recording the commitment
+        # here makes it durable before the first GET, so no fetched body can
+        # inform the frame, seed, sample, contract, or version it is judged by.
+        commit_quality_sample(
+            storage, run_id, quality_frame, quality_contracts,
+            created_at=effective_start,
+        )
     if not dry_run:
         executor = ControlledExecutor(
             storage, config.sites, plan, session=session, sleeper=sleeper

@@ -40,8 +40,8 @@ class Storage:
 
     def reset(self) -> None:
         tables = ("run_reports", "warnings", "blocked_events", "request_events",
-                  "planned_requests", "lease_accounting", "lease_actions",
-                  "site_leases", "runs")
+                  "planned_requests", "quality_commitments", "lease_accounting",
+                  "lease_actions", "site_leases", "runs")
         for table in tables:
             self.conn.execute(f"DROP TABLE IF EXISTS {table}")
         self.conn.commit()
@@ -288,6 +288,22 @@ class Storage:
 
     def get_warnings(self, run_id: str) -> list[dict[str, Any]]:
         return self._all("SELECT * FROM warnings WHERE run_id=? ORDER BY warning_id", (run_id,))
+
+    def save_quality_commitment(self, row: dict[str, Any]) -> None:
+        keys = ("run_id", "commitment_digest", "schema_version", "quality_version",
+                "version_digest", "frame_digest", "selected_digest", "contracts_digest",
+                "frame_json", "selected_json", "contracts_json", "created_at")
+        self.conn.execute(
+            "INSERT INTO quality_commitments VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            tuple(row[key] for key in keys),
+        )
+        self.conn.commit()
+
+    def get_quality_commitment(self, run_id: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM quality_commitments WHERE run_id=?", (run_id,)
+        ).fetchone()
+        return dict(row) if row else None
 
     def save_report(
         self, run_id: str, summary_json: str, summary_md: str, summary_html: str,

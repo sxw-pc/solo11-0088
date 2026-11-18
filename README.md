@@ -72,9 +72,9 @@ HTTP dispatch, survive replanning of the same run, and produce per-job rows in
 The offline `quality-audit` entrance reads a fixed URL sampling frame and one
 stored run. `fixtures/quality/frame.json` contains six in-scope URLs; its seed
 draws four without replacement into `fixtures/seeds/quality-sample.txt`. The
-local mock fixture lets `e.html` return one transient 500 before a 200. The
-audit shows first-attempt and eventual observed outcomes per selected URL. It
-does not turn the four observations into a population reliability rating.
+local mock fixture lets `e.html` return one transient 500 before a 200. Without
+`--intake`, the audit only shows first-attempt and eventual observed outcomes
+per selected URL; it makes no population claim.
 
 ```bash
 python -m crawlbudget run --config fixtures/quality_sampling.yaml \
@@ -82,6 +82,47 @@ python -m crawlbudget run --config fixtures/quality_sampling.yaml \
 python -m crawlbudget quality-audit --config fixtures/quality_sampling.yaml \
   --frame fixtures/quality/frame.json --run-id quality-sample
 ```
+
+### Population metadata certificate
+
+`--intake` turns the same run into a procurement acceptance decision. Pass
+`--quality-intake` to `run` so the frame, seed, the drawn sample, both contract
+declarations, and the code version digest are persisted against the `run_id`
+**before** any sampled `GET`. `quality-audit --intake` then verifies that
+commitment, matches each sampled URL only against its own recorded successful
+HTML receipt (`body_sha256`, byte count, `text/html`), and counts a URL as
+qualified only when every `required_fields` entry appears exactly once with a
+non-empty value in that URL's captured body.
+
+```bash
+python -m crawlbudget run --config fixtures/quality_sampling.yaml \
+  --run-id quality-sample \
+  --quality-intake fixtures/document_completeness/intake.json
+python -m crawlbudget quality-audit --config fixtures/quality_sampling.yaml \
+  --run-id quality-sample \
+  --intake fixtures/document_completeness/intake.json
+```
+
+`fixtures/document_completeness/intake.json` declares two customer contracts.
+`full_metadata` requires `title`, `owner`, `updated`, and `license`;
+`public_index` requires only the first three. For the fixed six-URL frame and
+four-document sample, `e.html` has no `license`, so the contracts diverge:
+
+| contract | x / n | 90% lower bound | 3/4 minimum | decision |
+| --- | --- | --- | --- | --- |
+| `full_metadata` | 3 / 4 | 3/6 | not met | refused |
+| `public_index` | 4 / 4 | 5/6 | met | signed |
+
+The lower bound is obtained by inverting the exact hypergeometric upper tail
+for sampling without replacement at one-sided alpha `1/10`; a candidate
+population count is rejected when `P(X >= x | K) <= 1/10`. The smallest
+surviving `K` is reported as `K/N`. The observed sample fraction is shown but is
+never used as the population fraction. Failed or mismatched GETs, missing
+captures, repeated fields, empty fields, and fields borrowed from other pages
+all count that URL as unqualified; retries are one URL, not extra documents.
+A changed frame, seed, sample, contract set, or version after execution is
+rejected rather than silently re-drawn. All arithmetic is integer-exact and
+offline; no external statistics service is used.
 
 Exit codes: `0` success, `1` general/storage error, `2` configuration or CLI
 error, `3` golden mismatch, `4` demo-server error, `130` interrupted.

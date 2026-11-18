@@ -29,6 +29,8 @@ pytest -q tests/test_golden.py
 | Execution | `test_executor.py` | Full replayed run, redirects not followed, body cap, retries, preflight block, interruption/resume, hard attempt cap. |
 | Orchestration | `test_resume.py`, `test_report.py` | Pipeline resume, fingerprint mismatch, dry run, summary contract, report stability, ledger rebuild. |
 | CLI/integration | `test_cli_demo.py` | Real loopback mock servers on ephemeral ports, demo idempotency, plan, inspect, config exit code, golden mismatch, dry run. |
+| Quality sampling | `test_quality_sampling.py` | Deterministic draw, retries as one URL, frame validation. |
+| Quality certification | `test_document_completeness.py`, `test_quality_commitment.py` | Pre-execution commitment, receipt matching, duplicate/empty/cross-page/missing captures, exact `3/6` and `5/6` bounds, divergent contract decisions, post-hoc seed/contract swap rejection, threshold boundaries, size caps, input reordering, and the CLI end-to-end path. |
 | Safety | `test_safety.py` | `trust_env=False`, fixture-local-only resources, mock prefix routing, loopback redirect blocked, read-only console and loopback bind. |
 | Golden | `test_golden.py` | Fixture equality, field-level old/new differences, missing fixture error, CLI success, no absolute paths/local time, type mismatch. |
 
@@ -49,6 +51,13 @@ The shared demo fixtures exercise all major paths:
 statuses, headers, and bytes as the mock sites without opening sockets. This
 keeps unit execution fast and reproducible while integration tests exercise the
 real Flask servers.
+
+Quality-certificate tests build hermetic frames, captures, and configs under
+`tmp_path`. They never rely on wall-clock time or an external statistics
+service. The committed sample is deterministic: for four-URL test frames the
+seeds `b1`, `b3`, and `b67` select known subsets, so tests can assert that
+changing the seed, a receipt, or a field changes `x`, the lower bound, and the
+sign/refuse decision without re-drawing after execution.
 
 `tests/conftest.py` provides:
 
