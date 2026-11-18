@@ -64,6 +64,10 @@ YAML config ──> validation ──> scope + robots + budget planner ──> l
 | `report_render.py` | Stable Markdown and self-contained HTML rendering. |
 | `golden.py` | Field-level and Markdown golden comparison. |
 | `demo_site.py` | Flask synthetic sites and background server lifecycle. |
+| `catalog_offers.py` | Offer extraction only from a successful body whose SHA matches the capture event; descriptive snapshot basket quotes. |
+| `promotion_economics.py` | Shared stock reservation and per-order money math: free-shipping threshold, vendor rebate, merchant contribution floor. |
+| `promotion_plan.py` | Whole-batch, per-contract branch-and-bound promotion search with budget, profit, stock, and stable tie-break rules. |
+| `catalog_promotion.py` | Greedy per-cart preview (baseline) plus the verified batch report CLI. |
 | `review_server.py` | Read-only Flask review console with CSP. |
 | `cli.py` | Argument parsing, command dispatch, exit codes. |
 
@@ -233,7 +237,54 @@ same section data and inline CSS; it references no scripts, fonts, or images.
 `check-golden` compares the summary recursively and then the Markdown text. It
 returns per-field old/new values, making drift actionable.
 
-## 10. Extending the system
+## 10. Whole-batch promotion planning
+
+`catalog_offers.extract_offers` only reads a body whose capture event is
+`outcome=success` and whose SHA-256 matches the event, so every price and stock
+figure used downstream is tied to a verified capture. `quote_basket` supplies
+the descriptive pre-discount basket total.
+
+`catalog_promotion.preview_promotions` remains a deliberately naive baseline:
+it takes the highest-`uplift_points` offer per cart independently. Those picks
+can share a budget they collectively exceed (the fixture's A+C+E discounts
+total 2500 against a 1300 merchant cap) or breach the merchant contribution
+floor, so they are not a signable customer offer.
+
+`promotion_plan.plan_promotions` builds the signable plan for each authorized
+funding contract:
+
+1. Carts are quoted against the real catalog and reserve shared stock in
+   sorted `cart_id` order; a cart whose SKUs are missing, understocked, or
+   already committed is blocked and never signed.
+2. For each offer, both possible funders are evaluated where allowed. A vendor
+   rebate exists only for `vendor_eligible` offers and only when the contract
+   has a positive vendor cap; an offer is funded by exactly one party.
+3. Per-order economics are: net merchandise = gross - discount; a 600 shipping
+   fee applies whenever net is below the 4000 free-shipping threshold;
+   merchant contribution = net + actual shipping - goods cost - merchant
+   shipping cost + vendor rebate, and must be at least 300 per signed order.
+4. A bounded depth-first branch-and-bound enumerates every feasible
+   "no offer or one (offer, funder)" assignment per cart (at most 9 choices
+   per cart, 8 carts). Budget overflows are pruned and counted; the uplift
+   bound only discards subtrees strictly below the incumbent, so no
+   equal-score tie-break candidate is lost.
+5. The objective maximizes total `uplift_points`, then total merchant
+   contribution, then the smallest stable `(cart_id, offer_id, funder)` key.
+   `uplift_points` are fictional quote-priority scores, not causal claims.
+
+The two fixture contracts illustrate why funding assignment is a cross-cart
+causal decision rather than a renamed block switch: under `merchant_pays`
+(merchant cap 1300, vendor cap 0) cart-1/A is profit-ineligible (contribution
+200) and the optimum is C+F at 14 points; under `vendor_eligible` (vendor cap
+1000, merchant cap 800) the same A becomes eligible via vendor rebate
+(contribution 1200, customer pays 3800), freeing merchant budget so A(vendor)
++C(merchant) reaches 20 points. Run:
+
+```bash
+python -m crawlbudget.catalog_promotion --fixture fixtures/catalog_promotion/intake.json
+```
+
+## 11. Extending the system
 
 Appropriate extensions preserve the safety model:
 
