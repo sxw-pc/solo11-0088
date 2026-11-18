@@ -61,6 +61,20 @@ DEMO_START_FAILED = "DEMO_START_FAILED"
 CLI_INVALID_ARGUMENT = "CLI_INVALID_ARGUMENT"
 CLI_UNEXPECTED = "CLI_UNEXPECTED"
 
+# Two-phase mirror availability contract errors.
+RES_MISSING_FIELD = "RES_MISSING_FIELD"
+RES_INVALID_VALUE = "RES_INVALID_VALUE"
+RES_DUPLICATE_ID = "RES_DUPLICATE_ID"
+RES_NEGATIVE_COST = "RES_NEGATIVE_COST"
+RES_UNKNOWN_SITE = "RES_UNKNOWN_SITE"
+RES_DISABLED_SITE = "RES_DISABLED_SITE"
+RES_UNKNOWN_NODE = "RES_UNKNOWN_NODE"
+RES_EMPTY_SCENARIO = "RES_EMPTY_SCENARIO"
+RES_LIMIT_EXCEEDED = "RES_LIMIT_EXCEEDED"
+RES_SITE_NOT_COVERED = "RES_SITE_NOT_COVERED"
+RES_CONTRACT_INVALID = "RES_CONTRACT_INVALID"
+RES_MODEL_INVALID = "RES_MODEL_INVALID"
+
 
 @dataclass(frozen=True)
 class ConfigIssue:
@@ -125,3 +139,25 @@ class DemoError(CrawlBudgetError):
 class CliError(CrawlBudgetError):
     code = CLI_INVALID_ARGUMENT
     exit_code = 2
+
+
+class ResilienceError(CrawlBudgetError):
+    """Rejected mirror model or service-contract obligation.
+
+    Carries structured issues so callers (and tests) can explain why a
+    fingerprinted contract could not be signed instead of silently treating
+    the request as a zero-outage plan.
+    """
+
+    code = RES_MODEL_INVALID
+    exit_code = 2
+
+    def __init__(self, issues: list[ConfigIssue]) -> None:
+        self.issues = tuple(issues)
+        message = "mirror availability contract rejected"
+        super().__init__(message, details={"issues": [i.as_dict() for i in issues]})
+
+    def __str__(self) -> str:
+        return "\n".join(
+            f"{issue.code} {issue.path}: {issue.message}" for issue in self.issues
+        )

@@ -50,5 +50,9 @@
       ],
       "outage_compensation": 2
     }
+  },
+  "limits": {
+    "max_harden_nodes": 1,
+    "max_repair_per_scenario": 1
   }
 }
