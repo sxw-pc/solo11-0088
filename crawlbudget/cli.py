@@ -21,6 +21,7 @@ from .errors import (
     CrawlBudgetError,
     StorageError,
 )
+from .landing_rights_intake import compute_adaptive_policies, verify_landing_intake
 from .pipeline import (
     DEFAULT_VIRTUAL_START,
     inspect_run,
@@ -80,6 +81,20 @@ def build_parser() -> argparse.ArgumentParser:
     golden.add_argument("--run-id", help="run id; defaults to latest run")
     golden.add_argument("--expected-dir", default="fixtures/expected")
     golden.add_argument("--project-root", default=".")
+
+    landing = sub.add_parser(
+        "landing-rights",
+        help="capture the synthetic landing page and compute rights audit policies",
+    )
+    landing.add_argument("--config", default="fixtures/landing_rights/site.yaml")
+    landing.add_argument("--db", default="var/landing_rights.sqlite3")
+    landing.add_argument("--reports-dir", default="var/reports-landing")
+    landing.add_argument("--pages-dir", default="fixtures/landing_rights")
+    landing.add_argument("--manifest", default="fixtures/landing_rights/manifest.yaml")
+    landing.add_argument("--project-root", default=".")
+    landing.add_argument("--run-id", default="landing-run")
+    landing.add_argument("--body", default="fixtures/landing_rights/mock-landing_landing.html")
+    landing.add_argument("--intake", default="fixtures/landing_rights/intake.json")
     return parser
 
 
@@ -151,6 +166,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _inspect_command(args, root)
     if args.command == "check-golden":
         return _golden_command(args, root)
+    if args.command == "landing-rights":
+        return _landing_rights_command(args, root)
     db_path = _path(root, args.db)
     Storage(db_path).close()
     try:
@@ -227,6 +244,26 @@ def _golden_command(args: argparse.Namespace, root: Path) -> int:
                   file=sys.stderr)
         return 3
     print(f"GOLDEN_OK {run_id}")
+    return 0
+
+
+def _landing_rights_command(args: argparse.Namespace, root: Path) -> int:
+    db_path = _path(root, args.db)
+    run_demo(
+        _path(root, args.config),
+        project_root=root,
+        db_path=db_path,
+        reports_dir=_path(root, args.reports_dir),
+        pages_dir=_path(root, args.pages_dir),
+        manifest_path=_path(root, args.manifest),
+        run_id=args.run_id,
+    )
+    with Storage(db_path) as storage:
+        intake = verify_landing_intake(
+            storage, args.run_id, _path(root, args.body), _path(root, args.intake)
+        )
+    policies = compute_adaptive_policies(intake)
+    sys.stdout.write(json.dumps(policies, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
     return 0
 
 
