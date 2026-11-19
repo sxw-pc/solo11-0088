@@ -29,7 +29,10 @@ def test_summary_contract_and_self_referential_fingerprint(executed):
         "sites": 3, "jobs": 3, "planned_requests": 21, "granted_requests": 14,
         "executed_requests": 14, "http_attempts": 17, "blocked_events": 9,
         "response_bytes": 3189,
+        "remote_receipts_verified": 0, "receipt_quarantined": 0,
+        "receipt_recovered": 0,
     }
+    assert summary["receipt_attestations"] == []
     assert summary["request_status_counts"] == {"200": 10, "302": 1, "404": 2, "500": 4}
     assert summary["top_blocked_reasons"][0] == {"reason": "robots_disallow", "count": 3}
     assert len(summary["robots_matches"]) == 5

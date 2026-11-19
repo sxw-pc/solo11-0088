@@ -78,6 +78,7 @@ def create_review_app(db_path: str | Path) -> Flask:
         events = db.get_request_events(run_id)
         blocked = db.get_blocked(run_id)
         warnings = db.get_warnings(run_id)
+        receipts = db.get_dispatch_receipts(run_id)
         report = db.get_report(run_id)
         summary_link = (
             f'<a href="/runs/{html.escape(run_id)}/report">summary.html</a> · '
@@ -124,11 +125,20 @@ def create_review_app(db_path: str | Path) -> Flask:
             [[row["code"], row["message"], _compact_json(row["context_json"])]
              for row in warnings],
         )
+        receipt_table = _rows_table(
+            ["Dispatch ID", "Site", "Job", "Attempt", "State", "Delivery",
+             "Contract", "Conflict"],
+            [[row["dispatch_id"][:16], row["site_id"], row["job_id"], row["attempt"],
+              row["receipt_state"], row["delivery_conclusion"],
+              row["recovery_contract"] or "-", row["conflict_detail"] or "-"]
+             for row in receipts],
+        )
         content = (
             f"<h1>Run {html.escape(run_id)}</h1>"
             f'<p><a href="/">← all runs</a> · {summary_link}</p>'
             f"<h2>Run</h2>{run_info}<h2>Budget leases</h2>{lease_table}"
             f"<h2>Planned requests</h2>{plan_table}<h2>Request events</h2>{event_table}"
+            f"<h2>Receipt attestations</h2>{receipt_table}"
             f"<h2>Blocked events</h2>{blocked_table}<h2>Warnings</h2>{warning_table}"
             '<p class="muted">This console is read-only and exposes no mutation controls.</p>'
         )

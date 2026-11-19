@@ -125,6 +125,7 @@ def refresh_accounting(storage: Storage, plan: Plan, *, settled_at: str) -> None
     actions = storage.get_lease_actions(plan.run_id)
     rows = storage.get_planned(plan.run_id)
     leases = storage.get_leases(plan.run_id)
+    receipts = storage.get_dispatch_receipts(plan.run_id)
     by_hash = {row["url_hash"]: row for row in rows}
     counts: dict[str, Counter[str]] = {
         lease["lease_id"]: Counter() for lease in leases
@@ -140,6 +141,18 @@ def refresh_accounting(storage: Storage, plan: Plan, *, settled_at: str) -> None
             if action["kind"] == "transfer":
                 target = by_hash[action["target_hash"]]
                 counts[target["lease_id"]]["transferred_in"] += 1
+    # Remote receipt admission: quarantined spend stays owned by the lease that
+    # dispatched it, and recovered delivery is distinct from audit-only spend.
+    valid_lease_ids = set(counts)
+    for receipt in receipts:
+        bucket = {
+            "quarantined": "quarantined",
+            "audit_settled": "receipt_pending",
+            "redelivered": "receipt_recovered",
+            "recorded": "receipt_pending",
+        }.get(receipt["receipt_state"], "")
+        if bucket and receipt["lease_id"] in valid_lease_ids:
+            counts[receipt["lease_id"]][bucket] += 1
     run = storage.get_run(plan.run_id)
     for lease in leases:
         count = counts[lease["lease_id"]]
@@ -154,5 +167,9 @@ def refresh_accounting(storage: Storage, plan: Plan, *, settled_at: str) -> None
             "cancelled": count["cancelled"],
             "transferred_in": count["transferred_in"],
             "transferred_out": count["transferred_out"],
-            "expired": count["expired"], "settled_at": settled_at,
+            "expired": count["expired"],
+            "quarantined": count["quarantined"],
+            "receipt_pending": count["receipt_pending"],
+            "receipt_recovered": count["receipt_recovered"],
+            "settled_at": settled_at,
         })

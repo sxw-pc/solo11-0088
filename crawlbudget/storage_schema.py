@@ -26,8 +26,29 @@ CREATE TABLE IF NOT EXISTS lease_accounting (
   consumed INTEGER NOT NULL, available INTEGER NOT NULL,
   cancelled INTEGER NOT NULL, transferred_in INTEGER NOT NULL,
   transferred_out INTEGER NOT NULL, expired INTEGER NOT NULL,
+  quarantined INTEGER NOT NULL DEFAULT 0,
+  receipt_pending INTEGER NOT NULL DEFAULT 0,
+  receipt_recovered INTEGER NOT NULL DEFAULT 0,
   settled_at TEXT NOT NULL,
   PRIMARY KEY (run_id, lease_id)
+);
+CREATE TABLE IF NOT EXISTS dispatch_intents (
+  dispatch_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, site_id TEXT NOT NULL,
+  job_id TEXT NOT NULL, url_hash TEXT NOT NULL, url TEXT NOT NULL,
+  attempt INTEGER NOT NULL, lease_id TEXT NOT NULL, state TEXT NOT NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_intents_run
+  ON dispatch_intents(run_id, site_id, url_hash);
+CREATE TABLE IF NOT EXISTS dispatch_receipts (
+  dispatch_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, site_id TEXT NOT NULL,
+  job_id TEXT NOT NULL, url_hash TEXT NOT NULL, attempt INTEGER NOT NULL,
+  lease_id TEXT NOT NULL, receipt_state TEXT NOT NULL,
+  delivery_conclusion TEXT NOT NULL, receipt_json TEXT NOT NULL,
+  recorded_at TEXT NOT NULL, settled_at TEXT,
+  recovery_contract TEXT NOT NULL DEFAULT '',
+  recovered_body_sha256 TEXT NOT NULL DEFAULT '',
+  conflict_detail TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS planned_requests (
   run_id TEXT NOT NULL, site_id TEXT NOT NULL, job_id TEXT NOT NULL,

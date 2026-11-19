@@ -58,7 +58,8 @@ YAML config ──> validation ──> scope + robots + budget planner ──> l
 | `budget.py` | Integer token bucket, quota helpers, lease identity/expiry/reason logic. |
 | `planner.py` | Deterministic plan construction and budget allocation. |
 | `storage.py` / `storage_schema.py` | SQLite ledger, idempotent writes, queries. |
-| `executor.py` | Guarded HTTP execution, revalidation, retries, body caps. |
+| `executor.py` | Guarded HTTP execution, revalidation, retries, body caps, receipt admission. |
+| `receipt.py` | Stable dispatch identities, offline HMAC receipts, verdict logic, recovery client. |
 | `pipeline.py` | End-to-end orchestration, resume, reset, inspect. |
 | `report.py` | Summary construction, report persistence. |
 | `report_render.py` | Stable Markdown and self-contained HTML rendering. |
@@ -67,8 +68,10 @@ YAML config ──> validation ──> scope + robots + budget planner ──> l
 | `review_server.py` | Read-only Flask review console with CSP. |
 | `cli.py` | Argument parsing, command dispatch, exit codes. |
 
-Each Python file is kept below 300 lines; the split follows responsibility, not
-line-count targets.
+Most Python files are kept below 300 lines; the split follows responsibility, not
+line-count targets. Modules that coordinate several responsibilities
+(`executor.py`, `storage.py`) intentionally exceed it rather than hide coupling
+behind artificial seams.
 
 ## 4. Run lifecycle
 
@@ -220,6 +223,24 @@ For every granted planned request:
 
 Attempts are counted per site from persisted request events, so an interrupted
 process can resume without exceeding the run limit.
+
+### 8.1 Pre-dispatch intents and receipt admission
+
+Before each GET, a `dispatch_intent` is persisted with a stable identity over
+`run_id / site_id / job_id / url_hash / attempt / lease_id`. On resume, any
+intent still in the open `dispatched` state is verified against the site before
+a second GET is allowed:
+
+- a verified receipt settles the spend under the `audit` or `redeliver`
+  contract without re-dispatching;
+- a definite site-side absence retires the identity and permits one budgeted
+  re-dispatch;
+- an unverifiable, identity-conflicting, or lease-conflicting claim quarantines
+  the spend on the dispatching lease and blocks re-dispatch.
+
+The receipt proves only site acceptance, never local delivery. Quarantined and
+receipt-settled spend is projected into `lease_accounting`; the report's receipt
+attestations carry the truthful delivery conclusion for each identity.
 
 ## 9. Reporting and golden verification
 

@@ -26,6 +26,8 @@ def build_summary(
     events = storage.get_request_events(run_id)
     blocked = storage.get_blocked(run_id)
     warnings = storage.get_warnings(run_id)
+    receipt_rows = storage.get_dispatch_receipts(run_id)
+    accounting = storage.get_lease_accounting(run_id)
     raw_status = Counter(
         str(event["status_code"]) if event["status_code"] is not None else "no_status"
         for event in events
@@ -42,17 +44,28 @@ def build_summary(
         for reason, count in sorted(blocked_counts.items(), key=lambda item: (-item[1], item[0]))[:3]
     ]
     site_payloads = []
+    accounting_by_lease = {row["lease_id"]: row for row in accounting}
     for site_id in sorted(config.sites):
         site = config.sites[site_id]
         site_planned = [row for row in planned if row["site_id"] == site_id]
         site_events = [row for row in events if row["site_id"] == site_id]
-        site_leases = [
-            {key: lease[key] for key in (
+        site_leases = []
+        for lease in leases:
+            if lease["site_id"] != site_id:
+                continue
+            payload = {key: lease[key] for key in (
                 "lease_id", "job_id", "granted_requests", "used_requests",
                 "remaining_requests", "expires_at", "reason",
             )}
-            for lease in leases if lease["site_id"] == site_id
-        ]
+            account = accounting_by_lease.get(lease["lease_id"])
+            if account is not None:
+                payload.update({
+                    key: int(account[key]) for key in (
+                        "quarantined", "receipt_pending", "receipt_recovered",
+                    )
+                })
+            site_leases.append(payload)
+        site_receipts = [row for row in receipt_rows if row["site_id"] == site_id]
         site_payloads.append({
             "site_id": site_id, "base_url": site.base_url, "enabled": site.enabled,
             "daily_quota": site.daily_quota,
@@ -64,6 +77,12 @@ def build_summary(
             "blocked_events": sum(1 for row in blocked if row["site_id"] == site_id),
             "http_attempts": len(site_events),
             "response_bytes": sum(int(row["response_bytes"]) for row in site_events),
+            "receipt_quarantined": sum(
+                1 for row in site_receipts if row["receipt_state"] == "quarantined"),
+            "receipt_audit_settled": sum(
+                1 for row in site_receipts if row["receipt_state"] == "audit_settled"),
+            "receipt_recovered": sum(
+                1 for row in site_receipts if row["receipt_state"] == "redelivered"),
             "leases": site_leases,
         })
     summary: dict[str, Any] = {
@@ -91,8 +110,16 @@ def build_summary(
             "http_attempts": len(events),
             "blocked_events": len(blocked),
             "response_bytes": sum(int(row["response_bytes"]) for row in events),
+            "remote_receipts_verified": sum(
+                1 for row in receipt_rows
+                if row["receipt_state"] in {"audit_settled", "redelivered"}),
+            "receipt_quarantined": sum(
+                1 for row in receipt_rows if row["receipt_state"] == "quarantined"),
+            "receipt_recovered": sum(
+                1 for row in receipt_rows if row["receipt_state"] == "redelivered"),
         },
         "sites": site_payloads,
+        "receipt_attestations": _receipt_attestations(receipt_rows),
         "request_status_counts": status_counts,
         "blocked_reason_counts": blocked_counts,
         "top_blocked_reasons": top_blocked,
@@ -169,6 +196,31 @@ def _json_or_empty(text: str | None) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def _receipt_attestations(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Flatten receipt ledger rows into report-facing attestation records."""
+    items = []
+    for row in rows:
+        receipt = _json_or_empty(row["receipt_json"])
+        items.append({
+            "dispatch_id": row["dispatch_id"],
+            "site_id": row["site_id"],
+            "job_id": row["job_id"],
+            "url_hash": row["url_hash"],
+            "attempt": row["attempt"],
+            "lease_id": row["lease_id"],
+            "receipt_state": row["receipt_state"],
+            "delivery_conclusion": row["delivery_conclusion"],
+            "recovery_contract": row["recovery_contract"],
+            "remote_status_code": receipt.get("status_code"),
+            "remote_body_sha256": receipt.get("body_sha256", ""),
+            "recovered_body_sha256": row["recovered_body_sha256"],
+            "conflict_detail": row["conflict_detail"],
+            "recorded_at": row["recorded_at"],
+            "settled_at": row["settled_at"],
+        })
+    return items
 
 
 def _write_text(path: Path, text: str) -> None:

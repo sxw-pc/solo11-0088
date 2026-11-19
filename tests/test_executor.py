@@ -20,7 +20,8 @@ def test_full_replayed_execution_records_everything(demo_config, demo_plan):
         session = demo_replay_session()
         sleeps: list[float] = []
         stats = _run_executor(storage, demo_config, demo_plan, session, sleeps)
-        assert stats == {"attempts": 17, "completed": 14, "skipped": 0, "blocked": 2}
+        assert stats == {"attempts": 17, "completed": 14, "skipped": 0, "blocked": 2,
+                         "receipt_verified": 0, "receipt_quarantined": 0}
         assert len(session.calls) == 17
         assert all(url.startswith("http://127.0.0.1:") for url in session.calls)
         assert all("example.invalid" not in url for url in session.calls)

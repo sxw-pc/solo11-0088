@@ -27,6 +27,9 @@ pytest -q tests/test_golden.py
 | Planning | `test_planner.py` | Deterministic ordering, quotas, run limits, robots evidence, disabled job/site, duplicate seeds, missing robots. |
 | Storage | `test_storage.py` | Schema behavior, idempotent events, lease usage, quota aggregation, reports, reset, run lifecycle. |
 | Execution | `test_executor.py` | Full replayed run, redirects not followed, body cap, retries, preflight block, interruption/resume, hard attempt cap. |
+| Receipt identity/persistence | `test_receipt_identity.py`, `test_dispatch_persistence.py` | Stable dispatch ids, offline HMAC verification, distinct identity/lease verdicts, intent reactivation, receipt upsert/quarantine. |
+| Receipt lifecycle | `test_receipt_lifecycle.py` | Audit vs. re-delivery contracts, definite absence re-dispatch, unverifiable/lease-conflict quarantine, transferred-lease spend, robots safety, idempotent rerun. |
+| Receipt HTTP integration | `test_receipt_http_integration.py` | Real Flask mock site: signed receipt endpoint, signed 404 absence, socket-drop interruption, end-to-end contract settlement. |
 | Orchestration | `test_resume.py`, `test_report.py` | Pipeline resume, fingerprint mismatch, dry run, summary contract, report stability, ledger rebuild. |
 | CLI/integration | `test_cli_demo.py` | Real loopback mock servers on ephemeral ports, demo idempotency, plan, inspect, config exit code, golden mismatch, dry run. |
 | Safety | `test_safety.py` | `trust_env=False`, fixture-local-only resources, mock prefix routing, loopback redirect blocked, read-only console and loopback bind. |

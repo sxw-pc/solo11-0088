@@ -52,6 +52,10 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--run-id", default="demo-run")
     demo.add_argument("--virtual-start", default=DEFAULT_VIRTUAL_START)
     demo.add_argument("--dry-run", action="store_true", help="plan only; no HTTP requests")
+    demo.add_argument(
+        "--receipt-contract", choices=("audit", "redeliver"), default="audit",
+        help="how to settle a verified remote receipt whose body was never stored",
+    )
 
     run = sub.add_parser("run", help="plan and execute against registered local mock sites")
     _common(run)
@@ -59,6 +63,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--virtual-start", default=DEFAULT_VIRTUAL_START)
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--no-mock", action="store_true", help="do not start built-in mock sites")
+    run.add_argument(
+        "--receipt-contract", choices=("audit", "redeliver"), default="audit",
+        help="how to settle a verified remote receipt whose body was never stored",
+    )
 
     plan = sub.add_parser("plan", help="print a deterministic plan without executing")
     _common(plan)
@@ -155,6 +163,7 @@ def _dispatch(args: argparse.Namespace) -> int:
                 virtual_start=args.virtual_start,
                 reset=args.reset,
                 dry_run=args.dry_run,
+                receipt_contract=args.receipt_contract,
             )
         else:
             result = _run_command(args, config_path, db_path, reports, pages, manifest, root)
@@ -202,6 +211,7 @@ def _run_command(args, config_path, db_path, reports, pages, manifest, root) -> 
                 virtual_start=args.virtual_start,
                 reports_dir=reports,
                 dry_run=args.dry_run,
+                receipt_contract=args.receipt_contract,
             )
         finally:
             stop_mock_servers(servers)

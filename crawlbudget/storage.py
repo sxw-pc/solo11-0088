@@ -40,6 +40,7 @@ class Storage:
 
     def reset(self) -> None:
         tables = ("run_reports", "warnings", "blocked_events", "request_events",
+                  "dispatch_receipts", "dispatch_intents",
                   "planned_requests", "lease_accounting", "lease_actions",
                   "site_leases", "runs")
         for table in tables:
@@ -133,14 +134,22 @@ class Storage:
     def upsert_lease_accounting(self, row: dict[str, Any]) -> None:
         keys = ("run_id", "lease_id", "site_id", "job_id", "state", "granted",
                 "consumed", "available", "cancelled", "transferred_in",
-                "transferred_out", "expired", "settled_at")
+                "transferred_out", "expired", "quarantined", "receipt_pending",
+                "receipt_recovered", "settled_at")
         self.conn.execute(
-            """INSERT INTO lease_accounting VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """INSERT INTO lease_accounting
+               (run_id, lease_id, site_id, job_id, state, granted, consumed,
+                available, cancelled, transferred_in, transferred_out, expired,
+                quarantined, receipt_pending, receipt_recovered, settled_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(run_id, lease_id) DO UPDATE SET
                  state=excluded.state, granted=excluded.granted,
                  consumed=excluded.consumed, available=excluded.available,
                  cancelled=excluded.cancelled, transferred_in=excluded.transferred_in,
                  transferred_out=excluded.transferred_out, expired=excluded.expired,
+                 quarantined=excluded.quarantined,
+                 receipt_pending=excluded.receipt_pending,
+                 receipt_recovered=excluded.receipt_recovered,
                  settled_at=excluded.settled_at""",
             tuple(row[key] for key in keys),
         )
@@ -313,6 +322,107 @@ class Storage:
             "SELECT * FROM run_reports WHERE run_id=?", (run_id,)
         ).fetchone()
         return dict(row) if row else None
+
+    def insert_dispatch_intent(self, intent: dict[str, Any]) -> bool:
+        """Persist the pre-dispatch identity; reactivates a reused identity.
+
+        A stable dispatch id is deterministic in (run, site, job, url_hash,
+        attempt, lease). When a definite-absence verdict retires that identity
+        and the same attempt is re-dispatched, the same id comes back: it must
+        return to the open ``dispatched`` state so a second interruption is
+        still discoverable on the next resume.
+        """
+        cur = self.conn.execute(
+            """INSERT INTO dispatch_intents
+               (dispatch_id, run_id, site_id, job_id, url_hash, url, attempt,
+                lease_id, state, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(dispatch_id) DO UPDATE SET
+                 state='dispatched', updated_at=excluded.updated_at""",
+            (intent["dispatch_id"], intent["run_id"], intent["site_id"],
+             intent["job_id"], intent["url_hash"], intent["url"],
+             int(intent["attempt"]), intent["lease_id"], intent["state"],
+             intent["created_at"], intent["updated_at"]),
+        )
+        self.conn.commit()
+        return bool(cur.rowcount)
+
+    def get_dispatch_intent(
+        self, dispatch_id: str
+    ) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM dispatch_intents WHERE dispatch_id=?", (dispatch_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def get_open_dispatch_intents(self, run_id: str) -> list[dict[str, Any]]:
+        return self._all(
+            """SELECT * FROM dispatch_intents
+               WHERE run_id=? AND state='dispatched'
+               ORDER BY rowid""",
+            (run_id,),
+        )
+
+    def update_dispatch_intent_state(
+        self, dispatch_id: str, state: str, updated_at: str
+    ) -> None:
+        self.conn.execute(
+            "UPDATE dispatch_intents SET state=?, updated_at=? WHERE dispatch_id=?",
+            (state, updated_at, dispatch_id),
+        )
+        self.conn.commit()
+
+    def insert_dispatch_receipt(self, row: dict[str, Any]) -> bool:
+        cur = self.conn.execute(
+            """INSERT OR IGNORE INTO dispatch_receipts
+               (dispatch_id, run_id, site_id, job_id, url_hash, attempt, lease_id,
+                receipt_state, delivery_conclusion, receipt_json, recorded_at,
+                settled_at, recovery_contract, recovered_body_sha256, conflict_detail)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (row["dispatch_id"], row["run_id"], row["site_id"], row["job_id"],
+             row["url_hash"], int(row["attempt"]), row["lease_id"],
+             row["receipt_state"], row["delivery_conclusion"], row["receipt_json"],
+             row["recorded_at"], row.get("settled_at"),
+             row.get("recovery_contract", ""), row.get("recovered_body_sha256", ""),
+             row.get("conflict_detail", "")),
+        )
+        self.conn.commit()
+        return bool(cur.rowcount)
+
+    def upsert_dispatch_receipt(self, row: dict[str, Any]) -> None:
+        """Insert a receipt row or move an existing one to a new state."""
+        inserted = self.insert_dispatch_receipt(row)
+        if not inserted:
+            self.conn.execute(
+                """UPDATE dispatch_receipts
+                   SET receipt_state=?, delivery_conclusion=?,
+                       receipt_json=?, conflict_detail=?, settled_at=?
+                   WHERE dispatch_id=?""",
+                (row["receipt_state"], row["delivery_conclusion"], row["receipt_json"],
+                 row.get("conflict_detail", ""), row.get("settled_at"),
+                 row["dispatch_id"]),
+            )
+            self.conn.commit()
+
+    def update_dispatch_receipt(
+        self, dispatch_id: str, *, receipt_state: str, delivery_conclusion: str,
+        settled_at: str, recovery_contract: str = "",
+        recovered_body_sha256: str = "", conflict_detail: str = "",
+    ) -> None:
+        self.conn.execute(
+            """UPDATE dispatch_receipts
+               SET receipt_state=?, delivery_conclusion=?, settled_at=?,
+                   recovery_contract=?, recovered_body_sha256=?, conflict_detail=?
+               WHERE dispatch_id=?""",
+            (receipt_state, delivery_conclusion, settled_at, recovery_contract,
+             recovered_body_sha256, conflict_detail, dispatch_id),
+        )
+        self.conn.commit()
+
+    def get_dispatch_receipts(self, run_id: str) -> list[dict[str, Any]]:
+        return self._all(
+            "SELECT * FROM dispatch_receipts WHERE run_id=? ORDER BY rowid", (run_id,)
+        )
 
     def count_rows(self, table: str, run_id: str) -> int:
         allowed = {

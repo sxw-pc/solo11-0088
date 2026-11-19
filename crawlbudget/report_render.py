@@ -34,6 +34,12 @@ def _sections(summary: dict[str, Any]) -> list[tuple[str, list[str], list[list[A
          lease["reason"]]
         for site in sites for lease in site["leases"]
     ]
+    receipts = [
+        [item["site_id"], item["job_id"], item["attempt"], item["receipt_state"],
+         item["delivery_conclusion"], item["recovery_contract"] or "-",
+         item["remote_status_code"], item["conflict_detail"] or "-"]
+        for item in summary.get("receipt_attestations", [])
+    ]
     return [
         ("Totals", ["Metric", "Value"], [
             ["Sites", totals["sites"]],
@@ -43,6 +49,9 @@ def _sections(summary: dict[str, Any]) -> list[tuple[str, list[str], list[list[A
             ["HTTP attempts", totals["http_attempts"]],
             ["Blocked events", totals["blocked_events"]],
             ["Response bytes", totals["response_bytes"]],
+            ["Remote receipts verified", totals.get("remote_receipts_verified", 0)],
+            ["Receipts quarantined", totals.get("receipt_quarantined", 0)],
+            ["Receipts re-delivered", totals.get("receipt_recovered", 0)],
         ], "_No totals._"),
         ("Fingerprints", ["Artifact", "SHA-256"], [
             ["Configuration", fp["config"]], ["Seed manifests", fp["seeds"]],
@@ -63,6 +72,10 @@ def _sections(summary: dict[str, Any]) -> list[tuple[str, list[str], list[list[A
         ("Blocked reasons", ["Reason", "Count"],
          [[key, value] for key, value in summary["blocked_reason_counts"].items()],
          "_No blocked events._"),
+        ("Receipt attestations",
+         ["Site", "Job", "Attempt", "Receipt state", "Delivery", "Contract",
+          "Remote status", "Conflict detail"],
+         receipts, "_No remote receipts were attested._"),
         ("Robots rule matches", ["Site", "Path", "Decision", "Rule", "Pattern", "Group"], [
             [item["site_id"], item["path"], item["decision"], item["rule_id"],
              item["pattern"], item["group_user_agent"]]

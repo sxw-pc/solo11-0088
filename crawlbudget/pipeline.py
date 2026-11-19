@@ -56,6 +56,8 @@ def run_pipeline(
     dry_run: bool = False,
     session: Any | None = None,
     sleeper=None,
+    receipt_contract: str = "audit",
+    receipt_sources: dict[str, Any] | None = None,
 ) -> ExecutionResult:
     existing = storage.get_run(run_id)
     effective_start = existing["started_at"] if existing else virtual_start
@@ -108,7 +110,8 @@ def run_pipeline(
     stats: dict[str, int] = {}
     if not dry_run:
         executor = ControlledExecutor(
-            storage, config.sites, plan, session=session, sleeper=sleeper
+            storage, config.sites, plan, session=session, sleeper=sleeper,
+            receipt_contract=receipt_contract, receipt_sources=receipt_sources,
         )
         stats = executor.run()
         granted = sum(1 for request in plan.requests if request.allowed)
@@ -152,6 +155,7 @@ def run_demo(
     dry_run: bool = False,
     session: Any | None = None,
     sleeper=None,
+    receipt_contract: str = "audit",
 ) -> ExecutionResult:
     root = Path(project_root).resolve()
     config = load_config(config_path, project_root=root)
@@ -171,6 +175,7 @@ def run_demo(
                 dry_run=dry_run,
                 session=session,
                 sleeper=sleeper,
+                receipt_contract=receipt_contract,
             )
         finally:
             stop_mock_servers(servers)

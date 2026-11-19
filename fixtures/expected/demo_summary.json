@@ -12,7 +12,7 @@
     "config": "eebb9bbc3e093b880249302d33e6626cd522b8ebfebd53e655ee43e0a49b2f50",
     "seeds": "2da5a7a22c61ab1ea1797d44bf659528abb455c5852ee10854d3f7d342930bf8",
     "robots": "756450fe9483d002a312682f4352106575e6a76483b986a8acd53ee49e32071d",
-    "report": "319745f968dc7a4231cfa94dcd26091a87923ad5b930f7a74bb216c96fd4a91d"
+    "report": "c95c964482ad84dc35fb81e4e5d1a5755ac1fca1eb80b39e807e2074cbacc723"
   },
   "totals": {
     "sites": 3,
@@ -22,7 +22,10 @@
     "executed_requests": 14,
     "http_attempts": 17,
     "blocked_events": 9,
-    "response_bytes": 3189
+    "response_bytes": 3189,
+    "remote_receipts_verified": 0,
+    "receipt_quarantined": 0,
+    "receipt_recovered": 0
   },
   "sites": [
     {
@@ -38,6 +41,9 @@
       "blocked_events": 5,
       "http_attempts": 6,
       "response_bytes": 1832,
+      "receipt_quarantined": 0,
+      "receipt_audit_settled": 0,
+      "receipt_recovered": 0,
       "leases": [
         {
           "lease_id": "lease-e7b30fe27e6b7949",
@@ -46,7 +52,10 @@
           "used_requests": 6,
           "remaining_requests": 0,
           "expires_at": "2026-01-16T00:00:00Z",
-          "reason": "granted"
+          "reason": "granted",
+          "quarantined": 0,
+          "receipt_pending": 0,
+          "receipt_recovered": 0
         }
       ]
     },
@@ -63,6 +72,9 @@
       "blocked_events": 2,
       "http_attempts": 9,
       "response_bytes": 1141,
+      "receipt_quarantined": 0,
+      "receipt_audit_settled": 0,
+      "receipt_recovered": 0,
       "leases": [
         {
           "lease_id": "lease-9151a68e609120cf",
@@ -71,7 +83,10 @@
           "used_requests": 6,
           "remaining_requests": 0,
           "expires_at": "2026-01-16T00:00:00Z",
-          "reason": "granted"
+          "reason": "granted",
+          "quarantined": 0,
+          "receipt_pending": 0,
+          "receipt_recovered": 0
         }
       ]
     },
@@ -88,6 +103,9 @@
       "blocked_events": 2,
       "http_attempts": 2,
       "response_bytes": 216,
+      "receipt_quarantined": 0,
+      "receipt_audit_settled": 0,
+      "receipt_recovered": 0,
       "leases": [
         {
           "lease_id": "lease-7b54871ef063903c",
@@ -96,11 +114,15 @@
           "used_requests": 2,
           "remaining_requests": 0,
           "expires_at": "2026-01-16T00:00:00Z",
-          "reason": "granted"
+          "reason": "granted",
+          "quarantined": 0,
+          "receipt_pending": 0,
+          "receipt_recovered": 0
         }
       ]
     }
   ],
+  "receipt_attestations": [],
   "request_status_counts": {
     "200": 10,
     "302": 1,

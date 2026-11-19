@@ -268,4 +268,6 @@ class RunRecord:
 TERMINAL_OUTCOMES = frozenset({
     "success", "http_error", "redirect_blocked", "body_too_large",
     "transport_error_final", "preflight_blocked", "budget_exhausted",
+    # Remote receipt admission outcomes for interrupted dispatches.
+    "receipt_audit_settled", "receipt_recovered", "receipt_quarantined",
 })

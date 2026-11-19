@@ -32,3 +32,16 @@ mock-gamma:
     file: mock-gamma_page_one.html
   public/three.html:
     file: mock-gamma_page_three.html
+# Lease lifecycle site. __policy__ holds test injection switches consumed by
+# the mock site (corrupt_receipt_for / drop_response_for / omit_receipt_for);
+# an empty mapping means every receipt is issued and delivered normally.
+lease-demo:
+  __policy__: {}
+  a.html:
+    file: lease_demo_a.html
+  b.html:
+    file: lease_demo_b.html
+  c.html:
+    file: lease_demo_c.html
+  d.html:
+    file: lease_demo_d.html

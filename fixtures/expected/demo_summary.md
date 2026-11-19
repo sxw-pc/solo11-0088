@@ -17,6 +17,9 @@
 | HTTP attempts | 17 |
 | Blocked events | 9 |
 | Response bytes | 3189 |
+| Remote receipts verified | 0 |
+| Receipts quarantined | 0 |
+| Receipts re-delivered | 0 |
 
 ## Fingerprints
 
@@ -25,7 +28,7 @@
 | Configuration | eebb9bbc3e093b880249302d33e6626cd522b8ebfebd53e655ee43e0a49b2f50 |
 | Seed manifests | 2da5a7a22c61ab1ea1797d44bf659528abb455c5852ee10854d3f7d342930bf8 |
 | Robots fixtures | 756450fe9483d002a312682f4352106575e6a76483b986a8acd53ee49e32071d |
-| Report | 319745f968dc7a4231cfa94dcd26091a87923ad5b930f7a74bb216c96fd4a91d |
+| Report | c95c964482ad84dc35fb81e4e5d1a5755ac1fca1eb80b39e807e2074cbacc723 |
 
 ## Sites
 
@@ -63,6 +66,10 @@
 | run_limit_exceeded | 1 |
 | scope_non_loopback | 1 |
 | scope_out_of_site | 1 |
+
+## Receipt attestations
+
+_No remote receipts were attested._
 
 ## Robots rule matches
 

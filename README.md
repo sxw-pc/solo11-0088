@@ -132,6 +132,45 @@ Planning is independent of wall-clock time and process scheduling. Given the
 same config, fixtures, run ID, virtual start, and prior ledger state, the plan,
 lease IDs, offsets, reports, and fingerprints are identical.
 
+## Remote receipt verification
+
+A collection can reach the site yet never reach the local ledger when the
+process is interrupted between the GET and the `request_events` write. Three
+facts are therefore kept strictly separate:
+
+1. **remote receipt** — the site accepted one collection;
+2. **page delivery** — the local ledger retained the response body;
+3. **local quota consumed** — the owning lease was billed.
+
+Before every GET the executor persists a `dispatch_intent` whose stable
+identity binds `run_id / site_id / job_id / url_hash / attempt / lease_id`
+(`SHA-256` of the canonical binding). The loopback mock site answers a matched
+GET with an HMAC-signed receipt verifiable fully offline; the key is derived
+deterministically from the site id, so no key-distribution endpoint is trusted.
+
+On resume, an open intent is verified against the site's `__receipt__`
+endpoint before any re-dispatch:
+
+- **matched receipt** — the spend is settled under one of two explicit
+  contracts selected with `--receipt-contract`:
+  - `audit` (default): bill the spent quota but keep the truthful
+    `not_delivered` conclusion; a receipt alone never reports a retained page.
+  - `redeliver`: re-fetch the same-identity body from `__recover__` at **zero
+    new collection cost** and mark it `recovered_after_receipt`, never claiming
+    the original response was delivered.
+- **definite absence** (signed site 404) — the identity is retired and the
+  request may be re-dispatched once, within budget, under a fresh intent.
+- **unverifiable claim, identity conflict, or lease-ownership conflict** — the
+  quota is quarantined on the lease that dispatched it; the request is never
+  re-sent and an empty local event table is never treated as unspent budget.
+
+Receipt spend always follows the current lease binding: a quota transferred
+from `priority` to `waiting` is settled against the waiting lease, and the
+priority lease can never reclaim it. robots/scope-blocked URLs never reach the
+admission gate. Receipt rows land in `dispatch_intents` / `dispatch_receipts`,
+flow into `lease_accounting`, and surface in the report's
+"Receipt attestations" section.
+
 ## Safety properties
 
 - Only `http://127.0.0.1:<port>/` and `http://[::1]:<port>/` targets are
@@ -154,9 +193,10 @@ operator checklist.
 ## Ledger and reports
 
 The SQLite ledger contains `runs`, `site_leases`, `planned_requests`,
-`request_events`, `blocked_events`, `warnings`, and `run_reports`. Unique keys
-make event insertions and repeated runs idempotent. Reusing a run ID resumes the
-run; reusing it with different config/seed/robots fingerprints is rejected.
+`request_events`, `dispatch_intents`, `dispatch_receipts`, `blocked_events`,
+`warnings`, and `run_reports`. Unique keys make event insertions and repeated
+runs idempotent. Reusing a run ID resumes the run; reusing it with different
+config/seed/robots fingerprints is rejected.
 
 Each run writes three reports under `var/reports/<run-id>/`:
 
