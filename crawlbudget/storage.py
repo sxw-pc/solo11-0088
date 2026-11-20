@@ -39,8 +39,8 @@ class Storage:
         self.conn.commit()
 
     def reset(self) -> None:
-        tables = ("run_reports", "warnings", "blocked_events", "request_events",
-                  "planned_requests", "site_leases", "runs")
+        tables = ("run_reports", "capture_receipts", "warnings", "blocked_events",
+                  "request_events", "planned_requests", "site_leases", "runs")
         for table in tables:
             self.conn.execute(f"DROP TABLE IF EXISTS {table}")
         self.conn.commit()

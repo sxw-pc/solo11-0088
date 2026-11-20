@@ -59,6 +59,11 @@ YAML config ──> validation ──> scope + robots + budget planner ──> l
 | `planner.py` | Deterministic plan construction and budget allocation. |
 | `storage.py` / `storage_schema.py` | SQLite ledger, idempotent writes, queries. |
 | `executor.py` | Guarded HTTP execution, revalidation, retries, body caps. |
+| `conditional_capture.py` | Loopback-only conditional GET receipts (200 bytes or 304 validators) with idempotent ledger persistence; never reuses a representation. |
+| `representation.py` | Offline representation attestation: report model, Vary/ETag rules, deterministic JSON and fingerprint. |
+| `representation_engine.py` | Fact loading from receipts and request events, body-file integrity, candidate validation. |
+| `representation_verdicts.py` | Per-URL/per-variant verdicts and the two consumer contracts. |
+| `representation_cli.py` | Handlers for the `capture` and `representation` CLI subcommands. |
 | `pipeline.py` | End-to-end orchestration, resume, reset, inspect. |
 | `report.py` | Summary construction, report persistence. |
 | `report_render.py` | Stable Markdown and self-contained HTML rendering. |
@@ -163,6 +168,14 @@ Primary key `run_id`; stores JSON, Markdown, and HTML report bodies, the report
 fingerprint, and creation time. Persisting a report also updates the run row's
 report fingerprint.
 
+### `capture_receipts`
+
+Auto-incremented `receipt_id`; immutable conditional-capture facts keyed
+uniquely by `(run_id, site_id, url, status, recorded_at, request_headers_json)`.
+A 200 row records the body digest and content-addressed file path; a 304 row
+records ETag/Vary/request-header facts with no body. `INSERT OR IGNORE` keeps
+repeated offline captures idempotent.
+
 Foreign-key enforcement is enabled; WAL mode is used for file databases and
 memory mode for `:memory:`. Runtime directories are created automatically.
 
@@ -245,3 +258,53 @@ Appropriate extensions preserve the safety model:
 
 Extensions that add arbitrary remote hosts, redirect following, credential
 handling, or bypass switches are explicitly outside the design.
+
+## 11. Offline representation attestation
+
+Conditional capture and representation attestation are deliberately separate
+from the guarded executor. The executor still blocks every `3xx`; it is not a
+cache. A second, explicitly invoked entry point (`capture`) is allowed to
+record `200` and `304` facts for a registered loopback site, and it never
+decides what a `304` may reuse.
+
+### Evidence and storage
+
+- `capture_receipts` stores immutable facts: site, URL, request headers,
+  status, ETag, Vary, body digest/path for a 200, and a virtual timestamp.
+  Inserts are idempotent on the full fact identity.
+- A 200 body is written once to a content-addressed `<sha256>.body` file under
+  the local bodies directory. A 304 receipt never carries a body.
+- The attestation engine also reads successful executor `request_events`
+  (2xx with a body digest) and the body files on disk. It opens no socket.
+
+### Candidate identity and Vary isolation
+
+A 200 is a candidate only when site, URL, request variant, the digest in the
+persisted event/receipt, and the actual file SHA-256 all agree. A 304 is
+matched along the same URL and the request-header dimensions named by
+`Vary`; the `zh` body can never backfill an `en` request. The engine never
+guesses a body SHA from the latest 304. Stable non-publication reasons cover
+`Vary: *`, missing/tampered/unreadable body files, conflicting same-variant
+candidates, validator mismatch or absence, and subjects with only failed
+GETs.
+
+### Consumer contracts
+
+The two contracts are evaluated independently and each reports a
+reviewable, deterministic result:
+
+- `semantic-readable` may reuse an old 200 behind an applicable weak-ETag
+  304, but retains the old body SHA, the 304 validator receipt, and the
+  evidence level `weak_validator_304_semantic_only`; it cannot prove the
+  current server bytes are identical (`current_bytes_identical=false`).
+- `byte-exact` publishes an exact snapshot only for a fresh 200 or a
+  strong-validator 304 chain. A weak validator yields
+  `weak_validator_not_byte_exact`; the old SHA is never presented as the
+  current server digest. This byte-exact bar is a product requirement, not a
+  claim that HTTP forbids weak-tag caching in general.
+
+Changing a captured Vary/ETag/body SHA or a persisted event SHA recomputes
+candidate identity and both contract outcomes (or blocks publication); it is
+never reduced to an informational warning. Re-running the attestation over
+unchanged inputs produces byte-identical JSON, including the report
+fingerprint.

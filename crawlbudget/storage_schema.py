@@ -49,6 +49,14 @@ CREATE TABLE IF NOT EXISTS run_reports (
   run_id TEXT PRIMARY KEY, summary_json TEXT NOT NULL, summary_md TEXT NOT NULL,
   summary_html TEXT NOT NULL, report_fingerprint TEXT NOT NULL, created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS capture_receipts (
+  receipt_id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL,
+  site_id TEXT NOT NULL, url TEXT NOT NULL, request_headers_json TEXT NOT NULL,
+  status INTEGER NOT NULL, etag TEXT NOT NULL, vary TEXT NOT NULL,
+  body_sha256 TEXT, body_path TEXT, recorded_at TEXT NOT NULL,
+  UNIQUE (run_id, site_id, url, status, recorded_at, request_headers_json)
+);
+CREATE INDEX IF NOT EXISTS idx_receipts_run ON capture_receipts(run_id, site_id, url);
 CREATE INDEX IF NOT EXISTS idx_events_run_site ON request_events(run_id, site_id);
 CREATE INDEX IF NOT EXISTS idx_planned_run ON planned_requests(run_id, request_order);
 CREATE INDEX IF NOT EXISTS idx_blocked_run ON blocked_events(run_id);

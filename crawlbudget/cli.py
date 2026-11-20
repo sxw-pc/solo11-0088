@@ -30,6 +30,7 @@ from .pipeline import (
 )
 from .planner import build_plan
 from .golden import check_golden_from_storage
+from .representation_cli import capture_command, representation_command
 from .review_server import serve_review
 from .storage import Storage
 from .util import parse_utc, virtual_date
@@ -80,6 +81,31 @@ def build_parser() -> argparse.ArgumentParser:
     golden.add_argument("--run-id", help="run id; defaults to latest run")
     golden.add_argument("--expected-dir", default="fixtures/expected")
     golden.add_argument("--project-root", default=".")
+
+    capture = sub.add_parser(
+        "capture", help="offline conditional GET against a registered loopback site",
+    )
+    _common(capture)
+    capture.add_argument("--run-id", default="capture-local")
+    capture.add_argument("--site", required=True, help="registered site_id")
+    capture.add_argument("--url", required=True, help="in-scope loopback URL")
+    capture.add_argument(
+        "--header", action="append", default=[], metavar="Name: Value",
+        help="request header; only Accept-Language and If-None-Match are allowed",
+    )
+    capture.add_argument("--bodies-dir", default="var/bodies")
+    capture.add_argument("--recorded-at", default=DEFAULT_VIRTUAL_START)
+    capture.add_argument("--no-mock", action="store_true")
+
+    attest = sub.add_parser(
+        "representation",
+        help="recompute offline representation attestations from the ledger",
+    )
+    attest.add_argument("--db", default="var/crawlbudget.sqlite3")
+    attest.add_argument("--run-id", required=True)
+    attest.add_argument("--bodies-dir", action="append", default=[])
+    attest.add_argument("--out", help="write the JSON report here instead of stdout")
+    attest.add_argument("--project-root", default=".")
     return parser
 
 
@@ -151,6 +177,11 @@ def _dispatch(args: argparse.Namespace) -> int:
         return _inspect_command(args, root)
     if args.command == "check-golden":
         return _golden_command(args, root)
+    if args.command == "capture":
+        config = load_config(_path(root, args.config), project_root=root)
+        return capture_command(args, config, root)
+    if args.command == "representation":
+        return representation_command(args, root)
     db_path = _path(root, args.db)
     Storage(db_path).close()
     try:

@@ -7,6 +7,7 @@ import json
 import posixpath
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import parse_qsl, urlencode, urlunsplit
 
@@ -52,6 +53,19 @@ def canonical_json(value: Any) -> str:
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def write_body_file(body_dir: str | Path, body: bytes) -> tuple[str, str]:
+    """Write a content-addressed body file once and return (sha256, path)."""
+    digest = sha256_bytes(body)
+    directory = Path(body_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / f"{digest}.body"
+    if target.exists() and target.read_bytes() != body:
+        raise ValueError("captured body digest collision")
+    if not target.exists():
+        target.write_bytes(body)
+    return digest, str(target)
 
 
 def sha256_text(text: str) -> str:

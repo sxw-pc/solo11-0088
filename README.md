@@ -54,6 +54,8 @@ byte-identical JSON and Markdown reports. `check-golden` exits with
 | `python -m crawlbudget serve --port 8765` | Start the read-only local review console (loopback only). |
 | `python -m crawlbudget inspect-run --run-id ID` | Print the stored run summary as JSON. |
 | `python -m crawlbudget check-golden --run-id ID` | Compare the stored report with `fixtures/expected/`. |
+| `python -m crawlbudget capture ...` | Offline conditional GET against one registered loopback URL; stores a 200 body or a 304 validator receipt. |
+| `python -m crawlbudget representation --run-id ID` | Recompute offline representation attestations and the `semantic-readable` / `byte-exact` contract verdicts. |
 
 Common run options include `--config`, `--db`, `--reports-dir`, `--run-id`,
 `--virtual-start`, and `--dry-run`. Use `--help` on any subcommand for details.
@@ -156,6 +158,35 @@ Each run writes three reports under `var/reports/<run-id>/`:
 The report fingerprint is the SHA-256 of the canonical summary with the report
 fingerprint field blank. Golden comparison reports old and new values per JSON
 path and the first differing Markdown line.
+
+## Offline representation attestation
+
+The guarded executor blocks every `3xx` and is not a cache. A separate,
+explicitly invoked offline path records conditional evidence and attests what
+can safely be published:
+
+- `capture` performs one loopback-only conditional GET, persisting either a
+  200 body (content-addressed by SHA-256) or a 304 validator receipt
+  (ETag/Vary/request headers). It never guesses which old body a 304 reuses.
+- `representation` recomputes verdicts purely from the receipts, persisted
+  2xx request events, and the body files on disk. It makes no network call.
+  A 200 is a candidate only when the recorded digest matches the real file;
+  a 304 is matched to an old 200 along the same URL and the `Vary`-selected
+  request headers, so an `en` request can never borrow a `zh` body.
+
+Two downstream contracts are reported independently for every subject:
+
+- **semantic-readable** may reuse an old 200 behind an applicable weak-ETag
+  304, keeping the old SHA and an explicit "current bytes not proven" level.
+- **byte-exact** publishes an exact snapshot only for a fresh 200 or a
+  strong-validator 304 chain. A weak validator blocks byte-exact publication
+  until a new 200 is obtained; the old digest is never labelled as the
+  current server digest.
+
+`Vary: *`, missing/tampered body files, conflicting same-variant candidates,
+validator mismatches, and only-failed GETs each produce a stable
+non-publication reason rather than a fabricated body. Any change to a captured
+Vary/ETag/SHA or a persisted event SHA recomputes (or blocks) the verdicts.
 
 ## Project layout
 

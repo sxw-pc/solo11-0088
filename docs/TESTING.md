@@ -127,7 +127,7 @@ with an explicit input code.
 
 The project enforces two structural constraints:
 
-- total Python source plus test lines between 2,500 and 4,500;
+- total Python source plus test lines between 2,500 and 6,000;
 - no single Python file over 300 lines.
 
 Check with:
@@ -136,7 +136,8 @@ Check with:
 wc -l crawlbudget/*.py tests/*.py
 ```
 
-The split is by responsibility (config, scope, robots, budget, planner, storage,
-executor, reporting, golden, demo sites, review console, CLI), not by artificial
-line compression. Tests are consolidated with parametrization where cases share
+The split is by responsibility (config, scope, robots, budget, planner,
+storage, executor, conditional capture, representation attestation,
+reporting, golden, demo sites, review console, CLI), not by artificial line
+compression. Tests are consolidated with parametrization where cases share
 setup, but each safety class retains explicit assertions.
