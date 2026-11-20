@@ -8,19 +8,20 @@ from typing import Any
 
 from .models import (
     BlockedEvent,
-    Lease,
     PlannedRequest,
     RequestEvent,
     RunRecord,
     WarningRecord,
 )
+from .storage_intents import IntentStore
+from .storage_leases import LeaseStore
 from .storage_schema import SCHEMA
 from .util import canonical_json
 
 
 
 
-class Storage:
+class Storage(IntentStore, LeaseStore):
     def __init__(self, path: str | Path) -> None:
         self.path = str(path)
         if self.path != ":memory:":
@@ -36,12 +37,24 @@ class Storage:
 
     def initialize(self) -> None:
         self.conn.executescript(SCHEMA)
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self) -> None:
+        columns = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(lease_accounting)")
+        }
+        if columns and "quarantined" not in columns:
+            self.conn.execute(
+                "ALTER TABLE lease_accounting "
+                "ADD COLUMN quarantined INTEGER NOT NULL DEFAULT 0"
+            )
 
     def reset(self) -> None:
         tables = ("run_reports", "warnings", "blocked_events", "request_events",
-                  "planned_requests", "lease_accounting", "lease_actions",
-                  "site_leases", "runs")
+                  "planned_requests", "dispatch_intents", "lease_accounting",
+                  "lease_actions", "site_leases", "runs")
         for table in tables:
             self.conn.execute(f"DROP TABLE IF EXISTS {table}")
         self.conn.commit()
@@ -88,63 +101,6 @@ class Storage:
 
     def list_runs(self) -> list[dict[str, Any]]:
         return self._all("SELECT * FROM runs ORDER BY created_at DESC, run_id ASC")
-
-    def upsert_lease(self, lease: Lease) -> None:
-        self.conn.execute(
-            """INSERT INTO site_leases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT(run_id, lease_id) DO UPDATE SET
-                 granted_requests=excluded.granted_requests,
-                 remaining_requests=max(0, excluded.granted_requests - site_leases.used_requests),
-                 expires_at=excluded.expires_at, reason=excluded.reason""",
-            (lease.run_id, lease.lease_id, lease.site_id, lease.job_id,
-             lease.granted_requests, lease.used_requests, lease.remaining_requests,
-             lease.expires_at, lease.reason),
-        )
-        self.conn.commit()
-
-    def get_leases(self, run_id: str) -> list[dict[str, Any]]:
-        return self._all(
-            "SELECT * FROM site_leases WHERE run_id=? ORDER BY site_id, job_id", (run_id,)
-        )
-
-    def get_lease_actions(self, run_id: str) -> list[dict[str, Any]]:
-        return self._all(
-            "SELECT * FROM lease_actions WHERE run_id=? ORDER BY rowid", (run_id,)
-        )
-
-    def insert_lease_action(self, action: dict[str, str]) -> None:
-        self.conn.execute(
-            """INSERT INTO lease_actions
-               (action_id, run_id, kind, source_hash, target_hash, as_of, reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            tuple(action[key] for key in (
-                "action_id", "run_id", "kind", "source_hash", "target_hash",
-                "as_of", "reason",
-            )),
-        )
-        self.conn.commit()
-
-    def get_lease_accounting(self, run_id: str) -> list[dict[str, Any]]:
-        return self._all(
-            "SELECT * FROM lease_accounting WHERE run_id=? ORDER BY site_id, job_id",
-            (run_id,),
-        )
-
-    def upsert_lease_accounting(self, row: dict[str, Any]) -> None:
-        keys = ("run_id", "lease_id", "site_id", "job_id", "state", "granted",
-                "consumed", "available", "cancelled", "transferred_in",
-                "transferred_out", "expired", "settled_at")
-        self.conn.execute(
-            """INSERT INTO lease_accounting VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-               ON CONFLICT(run_id, lease_id) DO UPDATE SET
-                 state=excluded.state, granted=excluded.granted,
-                 consumed=excluded.consumed, available=excluded.available,
-                 cancelled=excluded.cancelled, transferred_in=excluded.transferred_in,
-                 transferred_out=excluded.transferred_out, expired=excluded.expired,
-                 settled_at=excluded.settled_at""",
-            tuple(row[key] for key in keys),
-        )
-        self.conn.commit()
 
     def clear_plan_blocks(self, run_id: str) -> None:
         self.conn.execute(
@@ -316,7 +272,8 @@ class Storage:
 
     def count_rows(self, table: str, run_id: str) -> int:
         allowed = {
-            "planned_requests", "request_events", "blocked_events", "warnings", "site_leases"
+            "planned_requests", "request_events", "blocked_events", "warnings",
+            "site_leases", "dispatch_intents"
         }
         if table not in allowed:
             raise ValueError("unsupported table")

@@ -92,7 +92,8 @@ def record_action(
 ) -> dict[str, Any]:
     """Record one validated change on a staged run, then refresh its plan."""
     existing = storage.get_run(run_id)
-    if existing is None or not existing["dry_run"] or storage.get_request_events(run_id):
+    if (existing is None or not existing["dry_run"]
+            or storage.get_request_events(run_id) or storage.get_intents(run_id)):
         raise ValueError("lease actions require a staged run before HTTP dispatch")
     if (existing["config_fingerprint"] != config.config_fingerprint or
             existing["seeds_fingerprint"] != config.seeds_fingerprint or
@@ -132,6 +133,8 @@ def refresh_accounting(storage: Storage, plan: Plan, *, settled_at: str) -> None
     for row in rows:
         if row["block_reason"] == "lease_expired":
             counts[row["lease_id"]]["expired"] += 1
+        if row["final_outcome"] == "receipt_quarantined":
+            counts[row["lease_id"]]["quarantined"] += 1
     for action in actions:
         if action["kind"] != "expire":
             source = by_hash[action["source_hash"]]
@@ -154,5 +157,6 @@ def refresh_accounting(storage: Storage, plan: Plan, *, settled_at: str) -> None
             "cancelled": count["cancelled"],
             "transferred_in": count["transferred_in"],
             "transferred_out": count["transferred_out"],
-            "expired": count["expired"], "settled_at": settled_at,
+            "expired": count["expired"], "quarantined": count["quarantined"],
+            "settled_at": settled_at,
         })

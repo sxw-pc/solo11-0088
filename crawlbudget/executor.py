@@ -9,6 +9,7 @@ from urllib.parse import urljoin, urlsplit
 
 import requests
 
+from .adjudication import ReceiptAdjudicator
 from .budget import pacing_floor_ms, quota_available
 from .errors import (
     BUDGET_QUOTA_EXCEEDED,
@@ -20,6 +21,7 @@ from .errors import (
     EXEC_TRANSPORT_ERROR,
 )
 from .models import BlockedEvent, Lease, Plan, RequestEvent, SiteConfig, TERMINAL_OUTCOMES
+from .receipts import INTENT_HEADER, LEASE_HEADER, RUN_HEADER
 from .scope import external_location, scope_url
 from .storage import Storage
 from .util import elapsed_ms, iso_z, parse_utc, sha256_bytes
@@ -37,6 +39,8 @@ class ControlledExecutor:
         *,
         session: Any | None = None,
         sleeper: Callable[[float], None] | None = None,
+        receipt_contract: str = "audit",
+        receipt_verifier: Any | None = None,
     ) -> None:
         self.storage = storage
         self.sites = sites
@@ -48,8 +52,14 @@ class ControlledExecutor:
         self._start = parse_utc(plan.virtual_start)
         self._paced: set[str] = set()
         self.stats = {"attempts": 0, "completed": 0, "skipped": 0, "blocked": 0}
+        self.receipts = ReceiptAdjudicator(
+            storage, self.sites, stats=self.stats, clock=self._timestamp,
+            contract=receipt_contract, session=self.session,
+            verifier=receipt_verifier,
+        )
 
     def run(self) -> dict[str, int]:
+        self.receipts.reconcile_recorded(self.plan.run_id)
         rows = {
             (row["site_id"], row["url_hash"]): row
             for row in self.storage.get_planned(self.plan.run_id)
@@ -79,6 +89,8 @@ class ControlledExecutor:
         existing = self.storage.get_request_events(
             request.run_id, site_id=request.site_id, url_hash=request.url_hash
         )
+        if not self.receipts.admit(request, existing):
+            return
         if existing and existing[-1]["outcome"] in TERMINAL_OUTCOMES:
             self._complete(request, existing[-1]["outcome"])
             self.stats["skipped"] += 1
@@ -97,9 +109,13 @@ class ControlledExecutor:
                 self._complete(request, "budget_exhausted")
                 self.stats["blocked"] += 1
                 return
+            intent = self.receipts.persist_intent(request, attempt)
+            if intent is None:
+                return
             self._pace(site)
-            outcome, terminal, event = self._attempt(request, site, attempt)
+            outcome, terminal, event = self._attempt(request, site, attempt, intent)
             self.storage.insert_request_event(event)
+            self.receipts.settle_intent(intent, event)
             self.stats["attempts"] += 1
             if terminal:
                 self._complete(request, outcome)
@@ -114,7 +130,8 @@ class ControlledExecutor:
             request.run_id, request.site_id, request.url_hash, outcome
         )
 
-    def _attempt(self, request, site: SiteConfig, attempt: int) -> tuple[str, bool, RequestEvent]:
+    def _attempt(self, request, site: SiteConfig, attempt: int,
+                 intent: dict[str, Any]) -> tuple[str, bool, RequestEvent]:
         started = time.monotonic()
         status_code: int | None = None
         try:
@@ -123,7 +140,12 @@ class ControlledExecutor:
                 timeout=site.timeout_ms / 1000.0,
                 allow_redirects=False,
                 stream=True,
-                headers={"User-Agent": USER_AGENT},
+                headers={
+                    "User-Agent": USER_AGENT,
+                    INTENT_HEADER: intent["intent_id"],
+                    RUN_HEADER: request.run_id,
+                    LEASE_HEADER: intent["lease_id"],
+                },
             )
             status_code = int(response.status_code)
             elapsed = elapsed_ms(started)
@@ -227,21 +249,23 @@ class ControlledExecutor:
         response.close()
         return "body_too_large", True, event
 
+    def _timestamp(self, request, attempt: int) -> str:
+        offset = (request.virtual_offset_ms or 0) + (attempt - 1) * 1000
+        return iso_z(self._start + timedelta(milliseconds=offset))
+
     def _event(
         self, request, attempt: int, status_code: int | None, outcome: str,
         elapsed_ms: int, *, response_bytes: int = 0, content_type: str = "",
         body_sha256: str = "", error_code: str | None = None,
         evidence: dict[str, Any] | None = None,
     ) -> RequestEvent:
-        offset = (request.virtual_offset_ms or 0) + (attempt - 1) * 1000
-        recorded = iso_z(self._start + timedelta(milliseconds=offset))
         return RequestEvent(
             run_id=request.run_id, site_id=request.site_id, job_id=request.job_id,
             url_hash=request.url_hash, attempt=attempt, url=request.url,
             status_code=status_code, outcome=outcome, elapsed_ms=elapsed_ms,
             response_bytes=response_bytes, content_type=content_type,
             body_sha256=body_sha256, error_code=error_code,
-            evidence=evidence or {}, recorded_at=recorded,
+            evidence=evidence or {}, recorded_at=self._timestamp(request, attempt),
         )
 
     def _block(self, request, stage: str, reason: str, evidence: dict[str, Any], offset: int):

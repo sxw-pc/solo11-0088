@@ -32,3 +32,12 @@ mock-gamma:
     file: mock-gamma_page_one.html
   public/three.html:
     file: mock-gamma_page_three.html
+lease-demo:
+  a.html:
+    file: lease-demo_page_a.html
+  b.html:
+    file: lease-demo_page_b.html
+  c.html:
+    file: lease-demo_page_c.html
+  d.html:
+    file: lease-demo_page_d.html

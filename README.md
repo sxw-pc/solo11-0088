@@ -67,7 +67,33 @@ URL in another job on the same site, and `expire` settles unspent grants at the
 lease's UTC boundary. Each action needs a unique ID, UTC `--as-of`, and a
 `--reason`. For `expire`, `--source` is the site ID. Actions are recorded before
 HTTP dispatch, survive replanning of the same run, and produce per-job rows in
-`lease_accounting` alongside the original request ledger.
+`lease_accounting` alongside the original request ledger. Once any dispatch
+intent exists, lease actions for that run are rejected: an empty local event
+ledger is never read as "nothing dispatched".
+
+### Receipt verification on resume
+
+Every HTTP attempt is announced by a persisted `dispatch_intents` row binding
+run, site, job, URL hash, attempt, and the current lease owner into one stable
+intent ID, sent to the mock site as request headers. The mock site records a
+signed, offline-verifiable receipt for each arriving intent and serves receipt
+metadata (plus same-identity body retrieval) under
+`/__crawlbudget__/receipts/<intent-id>`. If the process stops between the
+remote response and the local event write, the next resume adjudicates the
+dangling intent before any new dispatch:
+
+- **Verified receipt** — the site accepted one collection; the amount settles
+  on the lease that owned the intent. Two explicit contracts select the
+  delivery conclusion: `--receipt-contract audit` (default) settles only the
+  consumed amount and keeps the truthful `receipt_undelivered` conclusion;
+  `--receipt-contract recover` retrieves the body under the same identity,
+  verifies it against the receipt, and records `recovered_delivery` without
+  new collection consumption. Neither claims the original response landed.
+- **Definitive signed absence** — the site proves the intent never arrived;
+  the amount was never spent and dispatch may continue within budget.
+- **Unverifiable credential or identity/ownership conflict** — the amount is
+  quarantined (`receipt_quarantined`): held against the lease, never
+  re-dispatched, and surfaced in `lease_accounting` and the report.
 
 Exit codes: `0` success, `1` general/storage error, `2` configuration or CLI
 error, `3` golden mismatch, `4` demo-server error, `130` interrupted.
@@ -153,8 +179,9 @@ operator checklist.
 
 ## Ledger and reports
 
-The SQLite ledger contains `runs`, `site_leases`, `planned_requests`,
-`request_events`, `blocked_events`, `warnings`, and `run_reports`. Unique keys
+The SQLite ledger contains `runs`, `site_leases`, `lease_actions`,
+`lease_accounting`, `planned_requests`, `request_events`, `dispatch_intents`,
+`blocked_events`, `warnings`, and `run_reports`. Unique keys
 make event insertions and repeated runs idempotent. Reusing a run ID resumes the
 run; reusing it with different config/seed/robots fingerprints is rejected.
 

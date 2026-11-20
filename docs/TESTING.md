@@ -28,6 +28,7 @@ pytest -q tests/test_golden.py
 | Storage | `test_storage.py` | Schema behavior, idempotent events, lease usage, quota aggregation, reports, reset, run lifecycle. |
 | Execution | `test_executor.py` | Full replayed run, redirects not followed, body cap, retries, preflight block, interruption/resume, hard attempt cap. |
 | Orchestration | `test_resume.py`, `test_report.py` | Pipeline resume, fingerprint mismatch, dry run, summary contract, report stability, ledger rebuild. |
+| Receipts | `test_receipt_verification.py`, `test_receipt_quarantine.py`, `test_receipt_integration.py` | Crash between response and event write: audit/recovery contracts, definitive absence redispatch, quarantine of unverifiable/conflicting credentials, lease-action veto, real mock-site receipts and fault hooks. |
 | CLI/integration | `test_cli_demo.py` | Real loopback mock servers on ephemeral ports, demo idempotency, plan, inspect, config exit code, golden mismatch, dry run. |
 | Safety | `test_safety.py` | `trust_env=False`, fixture-local-only resources, mock prefix routing, loopback redirect blocked, read-only console and loopback bind. |
 | Golden | `test_golden.py` | Fixture equality, field-level old/new differences, missing fixture error, CLI success, no absolute paths/local time, type mismatch. |
@@ -48,7 +49,11 @@ The shared demo fixtures exercise all major paths:
 `tests/fakes.py` provides a deterministic `ReplaySession` that returns the same
 statuses, headers, and bytes as the mock sites without opening sockets. This
 keeps unit execution fast and reproducible while integration tests exercise the
-real Flask servers.
+real Flask servers. `FakeReceiptVerifier` answers receipt verdicts (and
+same-identity body retrieval) without HTTP while still running the real token
+and binding checks. `tests/receipt_fixtures.py` builds the shared interrupted
+lease-transfer scenario: staged transfer, crash after the c.html response,
+signed receipt construction, and ledger assertion helpers.
 
 `tests/conftest.py` provides:
 

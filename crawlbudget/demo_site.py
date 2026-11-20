@@ -4,17 +4,30 @@ from __future__ import annotations
 
 import socket
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import yaml
-from flask import Flask, Response
+from flask import Flask, Response, jsonify, request
 from werkzeug.serving import make_server
 
 from .errors import DEMO_PORT_IN_USE, DemoError
 from .models import ConfigBundle, SiteConfig
-from .util import fixture_bytes, read_fixture_text
+from .receipts import (
+    INTENT_HEADER,
+    LEASE_HEADER,
+    RECEIPT_API_PREFIX,
+    RUN_HEADER,
+    sign_absence,
+    sign_receipt,
+)
+from .util import fixture_bytes, read_fixture_text, sha256_bytes
+
+# Test injection point: receives the signed receipt (and may mutate, re-sign
+# via crawlbudget.receipts.sign_receipt, corrupt, or drop it by returning
+# None) before the mock site stores it.
+ReceiptHook = Callable[[dict[str, Any]], dict[str, Any] | None]
 
 
 def load_page_manifest(path: str | Path) -> dict[str, dict[str, dict[str, Any]]]:
@@ -43,13 +56,44 @@ def create_site_app(
     site: SiteConfig,
     pages: dict[str, dict[str, Any]],
     pages_dir: str | Path,
+    *,
+    receipt_hook: ReceiptHook | None = None,
 ) -> Flask:
     app = Flask(f"crawlbudget_mock_{site.site_id}")
     app.config["CRAWLBUDGET_SITE"] = site.site_id
     fixture_root = Path(pages_dir)
     state: dict[str, int] = {}
+    receipts: dict[str, dict[str, Any]] = {}
+    bodies: dict[str, bytes] = {}
+    app.config["CRAWLBUDGET_RECEIPTS"] = receipts
+    app.config["CRAWLBUDGET_RECEIPT_BODIES"] = bodies
     lock = threading.Lock()
     base_path = site.base_path
+
+    def record_receipt(key: str, response: Response) -> None:
+        intent_id = request.headers.get(INTENT_HEADER, "")
+        if not intent_id:
+            return
+        body = response.get_data()
+        with lock:
+            seq = len(receipts) + 1
+        receipt = sign_receipt(site.site_id, {
+            "intent_id": intent_id,
+            "site_id": site.site_id,
+            "run_id": request.headers.get(RUN_HEADER, ""),
+            "lease_id": request.headers.get(LEASE_HEADER, ""),
+            "path": key,
+            "status": int(response.status_code),
+            "body_sha256": sha256_bytes(body),
+            "seq": seq,
+        })
+        if receipt_hook is not None:
+            receipt = receipt_hook(receipt)
+        if receipt is None:
+            return
+        with lock:
+            receipts[intent_id] = receipt
+            bodies[intent_id] = body
 
     @app.get(base_path)
     @app.get(base_path + "<path:subpath>")
@@ -57,33 +101,47 @@ def create_site_app(
         key = subpath.strip("/")
         entry = pages.get(key)
         if entry is None:
-            return _html(404, f"mock path not found in {site.site_id}", site.site_id)
+            response = _html(404, f"mock path not found in {site.site_id}", site.site_id)
+            record_receipt(key, response)
+            return response
         status = int(entry.get("status", 200))
         redirect = entry.get("redirect")
         if redirect:
-            return Response(
+            response = Response(
                 _page("Moved", f"synthetic redirect for {site.site_id}"),
                 status=302,
                 content_type="text/html; charset=utf-8",
                 headers={"Location": str(redirect), "X-Mock-Site": site.site_id},
             )
+            record_receipt(key, response)
+            return response
         fail_first = int(entry.get("fail_first", 0))
         if fail_first > 0:
             with lock:
                 seen = state.get(key, 0) + 1
                 state[key] = seen
             if seen <= fail_first:
-                return _html(500, "synthetic transient failure", site.site_id)
+                response = _html(500, "synthetic transient failure", site.site_id)
+                record_receipt(key, response)
+                return response
         if status >= 400 and "file" not in entry:
-            return _html(status, f"synthetic status {status}", site.site_id)
+            response = _html(status, f"synthetic status {status}", site.site_id)
+            record_receipt(key, response)
+            return response
         filename = str(entry.get("file", ""))
         if not filename:
-            return _html(404, "mock page file is not configured", site.site_id)
+            response = _html(404, "mock page file is not configured", site.site_id)
+            record_receipt(key, response)
+            return response
         if Path(filename).name != filename:
-            return _html(500, "invalid mock page filename", site.site_id)
+            response = _html(500, "invalid mock page filename", site.site_id)
+            record_receipt(key, response)
+            return response
         path = fixture_root / filename
         if not path.exists():
-            return _html(500, "mock page fixture missing", site.site_id)
+            response = _html(500, "mock page fixture missing", site.site_id)
+            record_receipt(key, response)
+            return response
         response = Response(
             fixture_bytes(path),
             status=status,
@@ -91,7 +149,25 @@ def create_site_app(
         )
         response.headers["X-Mock-Site"] = site.site_id
         response.headers["Cache-Control"] = "no-store"
+        record_receipt(key, response)
         return response
+
+    @app.get(RECEIPT_API_PREFIX + "/<intent_id>")
+    def receipt_lookup(intent_id: str) -> tuple[Any, int]:
+        with lock:
+            receipt = receipts.get(intent_id)
+        if receipt is None:
+            return jsonify(sign_absence(site.site_id, intent_id)), 404
+        return jsonify(receipt), 200
+
+    @app.get(RECEIPT_API_PREFIX + "/<intent_id>/body")
+    def receipt_body(intent_id: str) -> Response | tuple[Any, int]:
+        with lock:
+            known = intent_id in receipts
+            body = bodies.get(intent_id, b"")
+        if not known:
+            return jsonify(sign_absence(site.site_id, intent_id)), 404
+        return Response(body, content_type="text/html; charset=utf-8")
 
     @app.get("/healthz")
     def healthz() -> Response:
@@ -122,6 +198,8 @@ class RunningMockServer:
     port: int
     server: Any
     thread: threading.Thread
+    receipts: dict[str, dict[str, Any]] = field(default_factory=dict)
+    receipt_bodies: dict[str, bytes] = field(default_factory=dict)
 
     def stop(self) -> None:
         self.server.shutdown()
@@ -133,8 +211,10 @@ def start_mock_server(
     site: SiteConfig,
     pages: dict[str, dict[str, Any]],
     pages_dir: str | Path,
+    *,
+    receipt_hook: ReceiptHook | None = None,
 ) -> RunningMockServer:
-    app = create_site_app(site, pages, pages_dir)
+    app = create_site_app(site, pages, pages_dir, receipt_hook=receipt_hook)
     try:
         server = make_server(site.host, site.port, app, threaded=True)
     except OSError as exc:
@@ -149,7 +229,10 @@ def start_mock_server(
     thread.start()
     _wait_for_server(site.host, site.port)
     return RunningMockServer(
-        site_id=site.site_id, host=site.host, port=site.port, server=server, thread=thread
+        site_id=site.site_id, host=site.host, port=site.port, server=server,
+        thread=thread,
+        receipts=app.config["CRAWLBUDGET_RECEIPTS"],
+        receipt_bodies=app.config["CRAWLBUDGET_RECEIPT_BODIES"],
     )
 
 
@@ -157,14 +240,18 @@ def start_mock_servers(
     config: ConfigBundle,
     pages_dir: str | Path,
     manifest_path: str | Path,
+    *,
+    receipt_hooks: dict[str, ReceiptHook] | None = None,
 ) -> list[RunningMockServer]:
     manifest = load_page_manifest(manifest_path)
+    hooks = receipt_hooks or {}
     started: list[RunningMockServer] = []
     try:
         for site_id in sorted(config.sites):
             site = config.sites[site_id]
             started.append(
-                start_mock_server(site, manifest.get(site_id, {}), pages_dir)
+                start_mock_server(site, manifest.get(site_id, {}), pages_dir,
+                                  receipt_hook=hooks.get(site_id))
             )
     except Exception:
         stop_mock_servers(started)

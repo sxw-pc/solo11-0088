@@ -26,8 +26,19 @@ CREATE TABLE IF NOT EXISTS lease_accounting (
   consumed INTEGER NOT NULL, available INTEGER NOT NULL,
   cancelled INTEGER NOT NULL, transferred_in INTEGER NOT NULL,
   transferred_out INTEGER NOT NULL, expired INTEGER NOT NULL,
+  quarantined INTEGER NOT NULL DEFAULT 0,
   settled_at TEXT NOT NULL,
   PRIMARY KEY (run_id, lease_id)
+);
+CREATE TABLE IF NOT EXISTS dispatch_intents (
+  intent_id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL, site_id TEXT NOT NULL, job_id TEXT NOT NULL,
+  url_hash TEXT NOT NULL, attempt INTEGER NOT NULL,
+  lease_id TEXT NOT NULL, url TEXT NOT NULL,
+  state TEXT NOT NULL, resolution TEXT NOT NULL DEFAULT '',
+  receipt_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL, resolved_at TEXT NOT NULL DEFAULT '',
+  UNIQUE (run_id, site_id, url_hash, attempt)
 );
 CREATE TABLE IF NOT EXISTS planned_requests (
   run_id TEXT NOT NULL, site_id TEXT NOT NULL, job_id TEXT NOT NULL,
@@ -66,4 +77,5 @@ CREATE TABLE IF NOT EXISTS run_reports (
 CREATE INDEX IF NOT EXISTS idx_events_run_site ON request_events(run_id, site_id);
 CREATE INDEX IF NOT EXISTS idx_planned_run ON planned_requests(run_id, request_order);
 CREATE INDEX IF NOT EXISTS idx_blocked_run ON blocked_events(run_id);
+CREATE INDEX IF NOT EXISTS idx_intents_run ON dispatch_intents(run_id, state);
 """

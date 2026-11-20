@@ -85,7 +85,12 @@ Budgets are enforced in planning and again at execution:
   virtual UTC date, across runs. Retries count.
 - **Per-run limit**: caps attempts for the site and run. Remaining attempts are
   recomputed from the ledger before every try, so interruption/resume cannot
-  overshoot.
+  overshoot. A dispatch interrupted between the remote response and the local
+  event write is adjudicated against the site's signed receipt before any new
+  attempt: a verified receipt settles the spent amount (audit) or a verified
+  same-identity body retrieval (recovery), a signed absence frees it, and an
+  unverifiable or conflicting credential quarantines it so it cannot be
+  re-spent.
 - **Rate**: integer token bucket, `ceil(1000 / max_rps)` refill interval, with a
   crawl-delay floor.
 - **Response size**: declared `Content-Length` and streamed bytes are both
@@ -102,6 +107,7 @@ The ledger records:
 - run metadata and input fingerprints;
 - deterministic leases with grant/use/remaining counts and expiry;
 - every planned request with allow/block status and evidence;
+- every dispatch intent with its lease binding and resolution state;
 - every HTTP attempt with status, outcome, bytes, body SHA-256, and virtual time;
 - every planning or execution block with stage and reason;
 - warnings with structured context;

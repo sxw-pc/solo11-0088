@@ -13,6 +13,15 @@ from .report_render import dump_json, render_html, render_markdown
 from .storage import Storage
 from .util import SCHEMA_VERSION, fingerprint
 
+RECEIPT_OUTCOME_KEYS = (
+    "receipt_undelivered", "recovered_delivery", "receipt_quarantined",
+)
+
+
+def _receipt_outcomes(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts = Counter(str(row["final_outcome"]) for row in rows if row["final_outcome"])
+    return {key: counts.get(key, 0) for key in RECEIPT_OUTCOME_KEYS}
+
 
 def build_summary(
     config: ConfigBundle,
@@ -26,6 +35,8 @@ def build_summary(
     events = storage.get_request_events(run_id)
     blocked = storage.get_blocked(run_id)
     warnings = storage.get_warnings(run_id)
+    intents = storage.get_intents(run_id)
+    intent_states = dict(sorted(Counter(str(row["state"]) for row in intents).items()))
     raw_status = Counter(
         str(event["status_code"]) if event["status_code"] is not None else "no_status"
         for event in events
@@ -64,6 +75,7 @@ def build_summary(
             "blocked_events": sum(1 for row in blocked if row["site_id"] == site_id),
             "http_attempts": len(site_events),
             "response_bytes": sum(int(row["response_bytes"]) for row in site_events),
+            "receipts": _receipt_outcomes(site_planned),
             "leases": site_leases,
         })
     summary: dict[str, Any] = {
@@ -96,6 +108,10 @@ def build_summary(
         "request_status_counts": status_counts,
         "blocked_reason_counts": blocked_counts,
         "top_blocked_reasons": top_blocked,
+        "receipt_verification": {
+            "intent_states": intent_states,
+            **_receipt_outcomes(planned),
+        },
         "robots_matches": _robots_matches(planned),
         "warnings": [
             {"code": row["code"], "message": row["message"],

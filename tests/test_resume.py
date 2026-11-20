@@ -4,7 +4,7 @@ import pytest
 
 from crawlbudget.pipeline import run_pipeline
 from crawlbudget.storage import Storage
-from tests.fakes import demo_replay_session
+from tests.fakes import FakeReceiptVerifier, demo_replay_session
 
 
 class _InterruptingSession:
@@ -32,12 +32,16 @@ def test_interrupted_pipeline_resumes_without_refetching_completed(demo_config, 
         assert len(completed) == 4
         assert storage.get_report("resume-run") is None
         resumed = demo_replay_session()
+        # The interrupted run left one pre-dispatch intent whose GET never
+        # happened; the verifier proves non-arrival so resume may re-dispatch.
+        verifier = FakeReceiptVerifier()
         result = run_pipeline(demo_config, storage, "resume-run",
                               reports_dir=tmp_path / "reports", session=resumed,
-                              sleeper=lambda delay: None)
+                              sleeper=lambda delay: None, receipt_verifier=verifier)
         assert result.status == "completed"
         assert storage.attempt_count("resume-run") == 17
         assert len(resumed.calls) == 13
+        assert len(verifier.verified) == 1
         assert all(url not in resumed.calls for url in interrupting.calls)
         assert storage.get_run("resume-run")["status"] == "completed"
         assert storage.get_report("resume-run") is not None

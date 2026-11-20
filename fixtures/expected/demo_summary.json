@@ -12,7 +12,7 @@
     "config": "eebb9bbc3e093b880249302d33e6626cd522b8ebfebd53e655ee43e0a49b2f50",
     "seeds": "2da5a7a22c61ab1ea1797d44bf659528abb455c5852ee10854d3f7d342930bf8",
     "robots": "756450fe9483d002a312682f4352106575e6a76483b986a8acd53ee49e32071d",
-    "report": "319745f968dc7a4231cfa94dcd26091a87923ad5b930f7a74bb216c96fd4a91d"
+    "report": "bf0dd06d6bb9b6ffb1870cd450d40e57f4b197dc1605669d859ee3c7d5b50544"
   },
   "totals": {
     "sites": 3,
@@ -38,6 +38,11 @@
       "blocked_events": 5,
       "http_attempts": 6,
       "response_bytes": 1832,
+      "receipts": {
+        "receipt_undelivered": 0,
+        "recovered_delivery": 0,
+        "receipt_quarantined": 0
+      },
       "leases": [
         {
           "lease_id": "lease-e7b30fe27e6b7949",
@@ -63,6 +68,11 @@
       "blocked_events": 2,
       "http_attempts": 9,
       "response_bytes": 1141,
+      "receipts": {
+        "receipt_undelivered": 0,
+        "recovered_delivery": 0,
+        "receipt_quarantined": 0
+      },
       "leases": [
         {
           "lease_id": "lease-9151a68e609120cf",
@@ -88,6 +98,11 @@
       "blocked_events": 2,
       "http_attempts": 2,
       "response_bytes": 216,
+      "receipts": {
+        "receipt_undelivered": 0,
+        "recovered_delivery": 0,
+        "receipt_quarantined": 0
+      },
       "leases": [
         {
           "lease_id": "lease-7b54871ef063903c",
@@ -130,6 +145,14 @@
       "count": 1
     }
   ],
+  "receipt_verification": {
+    "intent_states": {
+      "settled": 17
+    },
+    "receipt_undelivered": 0,
+    "recovered_delivery": 0,
+    "receipt_quarantined": 0
+  },
   "robots_matches": [
     {
       "site_id": "mock-alpha",

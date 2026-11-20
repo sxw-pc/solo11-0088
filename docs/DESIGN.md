@@ -57,8 +57,11 @@ YAML config ──> validation ──> scope + robots + budget planner ──> l
 | `robots.py` | Offline robots parser, group selection, rule matching, crawl delay. |
 | `budget.py` | Integer token bucket, quota helpers, lease identity/expiry/reason logic. |
 | `planner.py` | Deterministic plan construction and budget allocation. |
-| `storage.py` / `storage_schema.py` | SQLite ledger, idempotent writes, queries. |
+| `storage.py` / `storage_schema.py` | SQLite ledger, idempotent writes, queries, migrations. |
+| `storage_intents.py` / `storage_leases.py` | Dispatch-intent and lease/accounting ledger mixins. |
 | `executor.py` | Guarded HTTP execution, revalidation, retries, body caps. |
+| `receipts.py` | Intent identity, offline-verifiable receipt tokens, verdicts. |
+| `adjudication.py` | Resume admission: settle, re-dispatch, or quarantine intents. |
 | `pipeline.py` | End-to-end orchestration, resume, reset, inspect. |
 | `report.py` | Summary construction, report persistence. |
 | `report_render.py` | Stable Markdown and self-contained HTML rendering. |
@@ -91,6 +94,9 @@ maximum granted offset plus one second (or the virtual start for a dry run).
   rejected before any new work.
 - Planned rows and leases are upserted, not duplicated.
 - Request events are unique per `(run_id, site_id, url_hash, attempt)`.
+- Every attempt is pre-announced by a persisted dispatch intent; a resuming
+  run adjudicates any dangling intent against the site's signed receipts
+  before it may dispatch again (see §8).
 - A completed planned request is skipped. A non-terminal event continues from
   the next attempt number, bounded by the site retry policy and the run attempt
   limit.
@@ -144,7 +150,26 @@ plan data while keeping execution state.
 
 Unique per `(run_id, site_id, url_hash, attempt)`. Records the actual HTTP
 attempt: status, outcome, elapsed milliseconds, retained bytes, content type,
-body SHA-256, error code, evidence JSON, and virtual timestamp.
+body SHA-256, error code, evidence JSON, and virtual timestamp. Receipt
+settlements also record here: `receipt_undelivered` (audit; no status, bytes,
+or body hash — the receipt alone never proves delivery), `recovered_delivery`
+(body retrieved under the same identity and verified against the receipt), and
+`receipt_quarantined` (amount held; no delivery claimed).
+
+### `dispatch_intents`
+
+Unique per `(run_id, site_id, url_hash, attempt)`. Persisted before each HTTP
+attempt; binds run, site, job, URL hash, attempt, and the current lease owner
+into a deterministic intent ID. States: `dispatched` (in flight),
+`settled` (event recorded or receipt settled), `voided` (site proved
+non-arrival), `quarantined` (unverifiable or conflicting credential; amount
+held). A resolved row stores the resolution and any verified receipt.
+
+### `lease_accounting`
+
+Projection per lease: state, granted/consumed/available, cancelled,
+transferred in/out, expired, and `quarantined` (amounts held pending evidence
+— counted as consumed so they can never be re-spent by the run).
 
 ### `blocked_events`
 
@@ -201,25 +226,62 @@ For every granted planned request:
 1. Re-run scope validation against the current URL and site registration. A
    failure is an execution block (`EXEC_PREFLIGHT_BLOCKED`) and no HTTP call is
    made.
-2. If a terminal event already exists, mark the planned row according to that
+2. Resolve dangling dispatch intents from earlier runs (see below). A
+   finalized request — settled by receipt or quarantined — is not dispatched.
+3. If a terminal event already exists, mark the planned row according to that
    outcome and skip.
-3. Before each attempt, verify the remaining attempt budget. If exhausted,
+4. Before each attempt, verify the remaining attempt budget. If exhausted,
    record a budget block and a `budget_exhausted` final outcome.
-4. Apply pacing via the injected sleeper, then issue `GET` with a bounded
-   timeout, `allow_redirects=False`, `stream=True`, `trust_env=False`, and a
-   fixed `User-Agent`.
-5. `3xx` responses are never followed. The target is classified; a non-loopback
+5. Persist the dispatch intent binding run, site, job, URL hash, attempt, and
+   lease owner, then apply pacing via the injected sleeper, then issue `GET`
+   with the intent identity headers, a bounded timeout,
+   `allow_redirects=False`, `stream=True`, `trust_env=False`, and a fixed
+   `User-Agent`.
+6. `3xx` responses are never followed. The target is classified; a non-loopback
    location produces `redirect_non_loopback`, otherwise `redirect_blocked`.
-6. `2xx` bodies are read in chunks and capped by `Content-Length` and the actual
+7. `2xx` bodies are read in chunks and capped by `Content-Length` and the actual
    retained size. Oversized bodies produce `body_too_large` and are not stored.
-7. Retryable statuses (`408`, `425`, `429`, `500`, `502`, `503`, `504`) and
+8. Retryable statuses (`408`, `425`, `429`, `500`, `502`, `503`, `504`) and
    timeout/transport failures retry up to `max_retries`; the last attempt is
    terminal. A non-retryable HTTP status is terminal immediately.
-8. Successful and terminal events close the response, record the event, and
-   mark the planned row complete exactly once.
+9. Successful and terminal events close the response, record the event, settle
+   the intent, and mark the planned row complete exactly once.
 
 Attempts are counted per site from persisted request events, so an interrupted
 process can resume without exceeding the run limit.
+
+### Receipt adjudication on resume
+
+A crash between the remote response and the local event write leaves a
+`dispatched` intent with no matching event: remote receipt, local delivery,
+and local consumption are then three different facts. On resume,
+`adjudication.py` resolves each dangling intent before that request may
+dispatch again:
+
+1. **Local ownership check.** The intent's identity (including lease owner)
+   must match the replanned request; a mismatch quarantines the amount without
+   contacting the site.
+2. **Receipt verification.** The mock site answers
+   `GET /__crawlbudget__/receipts/<intent-id>` with a signed receipt or a
+   signed absence statement; both are HMAC-SHA256 tokens over canonical JSON,
+   verifiable offline. A verified receipt whose echoed binding contradicts the
+   intent is a conflict; an invalid token or unreachable endpoint is
+   unverifiable.
+3. **Verified receipt.** The site accepted one collection, so the amount
+   settles on the intent's lease. The `audit` contract records
+   `receipt_undelivered` — consumption without a delivery claim. The `recover`
+   contract additionally retrieves the body under the same identity
+   (`.../body`), verifies its SHA-256 against the receipt, and records
+   `recovered_delivery`; no new collection attempt is counted. If retrieval
+   fails or mismatches, the run falls back to the audit conclusion.
+4. **Definitive absence.** The signed `not_received` statement proves the
+   amount was never spent; the intent is voided and dispatch continues within
+   budget, reusing the same intent identity.
+5. **Unverifiable or conflicting credential.** The amount is quarantined: a
+   `receipt_quarantined` event holds it against the lease, a blocked event
+   records the reason, and the run never re-dispatches that identity. An empty
+   local event ledger is never treated as "unspent", and lease actions are
+   rejected once any dispatch intent exists.
 
 ## 9. Reporting and golden verification
 

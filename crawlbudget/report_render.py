@@ -28,6 +28,16 @@ def _sections(summary: dict[str, Any]) -> list[tuple[str, list[str], list[list[A
     totals = summary["totals"]
     fp = summary["fingerprints"]
     sites = summary["sites"]
+    receipts = summary["receipt_verification"]
+    receipt_rows: list[list[Any]] = [
+        [f"Intents {state}", count]
+        for state, count in receipts["intent_states"].items()
+    ]
+    receipt_rows += [
+        ["Receipt-verified, response undelivered", receipts["receipt_undelivered"]],
+        ["Recovered deliveries", receipts["recovered_delivery"]],
+        ["Quarantined receipts", receipts["receipt_quarantined"]],
+    ]
     leases = [
         [lease["lease_id"], site["site_id"], lease["job_id"], lease["granted_requests"],
          lease["used_requests"], lease["remaining_requests"], lease["expires_at"],
@@ -63,6 +73,8 @@ def _sections(summary: dict[str, Any]) -> list[tuple[str, list[str], list[list[A
         ("Blocked reasons", ["Reason", "Count"],
          [[key, value] for key, value in summary["blocked_reason_counts"].items()],
          "_No blocked events._"),
+        ("Receipt verification", ["Metric", "Value"], receipt_rows,
+         "_No dispatch intents._"),
         ("Robots rule matches", ["Site", "Path", "Decision", "Rule", "Pattern", "Group"], [
             [item["site_id"], item["path"], item["decision"], item["rule_id"],
              item["pattern"], item["group_user_agent"]]

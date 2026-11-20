@@ -3,6 +3,11 @@
 from pathlib import Path
 from typing import Any
 
+from crawlbudget.receipts import (
+    VERDICT_NOT_RECEIVED,
+    ReceiptVerdict,
+    classify_receipt_reply,
+)
 from crawlbudget.util import fixture_bytes
 
 PAGES = Path(__file__).resolve().parent.parent / "fixtures" / "pages"
@@ -21,6 +26,37 @@ class FakeResponse:
 
     def close(self) -> None:
         pass
+
+
+class FakeReceiptVerifier:
+    """Receipt-verifier double; real token/binding checks, no HTTP.
+
+    receipts maps intent_id to a signed receipt dict; bodies maps intent_id
+    to the (body, content_type) the site would return for same-identity
+    retrieval. forced short-circuits every verdict (e.g. unverifiable).
+    """
+
+    def __init__(self, receipts: dict[str, dict] | None = None,
+                 bodies: dict[str, tuple[bytes, str]] | None = None,
+                 forced: str | None = None) -> None:
+        self.receipts = receipts or {}
+        self.bodies = bodies or {}
+        self.forced = forced
+        self.verified: list[str] = []
+        self.fetched: list[str] = []
+
+    def verify(self, intent: dict[str, Any]) -> ReceiptVerdict:
+        self.verified.append(intent["intent_id"])
+        if self.forced is not None:
+            return ReceiptVerdict(self.forced, detail="injected verdict")
+        receipt = self.receipts.get(intent["intent_id"])
+        if receipt is None:
+            return ReceiptVerdict(VERDICT_NOT_RECEIVED)
+        return classify_receipt_reply(intent, 200, receipt)
+
+    def fetch_body(self, intent: dict[str, Any], receipt: dict[str, Any]):
+        self.fetched.append(intent["intent_id"])
+        return self.bodies.get(intent["intent_id"])
 
 
 class ReplaySession:

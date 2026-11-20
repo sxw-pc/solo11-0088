@@ -212,6 +212,25 @@ class Plan:
     attempt_limits: dict[str, int]
     virtual_start: str
 
+
+@dataclass
+class DispatchIntent:
+    """Pre-dispatch persistent intent binding one HTTP attempt to its lease."""
+    intent_id: str
+    run_id: str
+    site_id: str
+    job_id: str
+    url_hash: str
+    attempt: int
+    lease_id: str
+    url: str
+    state: str = "dispatched"
+    resolution: str = ""
+    receipt: dict[str, Any] = field(default_factory=dict)
+    created_at: str = ""
+    resolved_at: str = ""
+
+
 @dataclass
 class RequestEvent:
     run_id: str
@@ -268,4 +287,5 @@ class RunRecord:
 TERMINAL_OUTCOMES = frozenset({
     "success", "http_error", "redirect_blocked", "body_too_large",
     "transport_error_final", "preflight_blocked", "budget_exhausted",
+    "receipt_undelivered", "recovered_delivery", "receipt_quarantined",
 })
