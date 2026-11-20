@@ -14,6 +14,7 @@ from .budget import quota_available
 from .config import load_config
 from .demo_site import start_mock_servers, stop_mock_servers
 from .errors import (
+    CLI_INVALID_ARGUMENT,
     CLI_UNEXPECTED,
     STORE_NOT_FOUND,
     CliError,
@@ -32,7 +33,7 @@ from .planner import build_plan
 from .golden import check_golden_from_storage
 from .review_server import serve_review
 from .storage import Storage
-from .change_monitor import build_change_monitor
+from .change_monitor import TRANSIENT_MODEL, build_change_monitor
 from .util import parse_utc, virtual_date
 
 LOG = logging.getLogger("crawlbudget")
@@ -81,10 +82,29 @@ def build_parser() -> argparse.ArgumentParser:
     golden.add_argument("--run-id", help="run id; defaults to latest run")
     golden.add_argument("--expected-dir", default="fixtures/expected")
     golden.add_argument("--project-root", default=".")
-    changes = sub.add_parser("change-monitor", help="compare captured page bodies across runs")
+    changes = sub.add_parser(
+        "change-monitor",
+        help="compare captured page bodies across runs and emit change contracts",
+    )
     changes.add_argument("--db", default="var/crawlbudget.sqlite3")
     changes.add_argument("--run-id", action="append", required=True)
     changes.add_argument("--project-root", default=".")
+    changes.add_argument(
+        "--declare-transient-workload", action="store_true",
+        help=(
+            "assert the pages are a stable, mutually independent, common-rate, "
+            "symmetric two-state continuous-time Markov workload; required "
+            "before transient-review may emit a probability"
+        ),
+    )
+    changes.add_argument(
+        "--transient-threshold", type=float, default=0.5,
+        help="manual-review threshold for the conditional hidden-change probability",
+    )
+    changes.add_argument(
+        "--min-calibration-intervals", type=int, default=8,
+        help="minimum one-day success-to-success calibration intervals",
+    )
     return parser
 
 
@@ -157,8 +177,22 @@ def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "check-golden":
         return _golden_command(args, root)
     if args.command == "change-monitor":
-        with Storage(_path(root, args.db)) as storage:
-            payload = build_change_monitor(storage, args.run_id)
+        workload = (
+            {
+                "declared": True, "model": TRANSIENT_MODEL,
+                "stationary": True, "independent": True, "common_rate": True,
+                "symmetric": True, "two_state": True,
+                "threshold": args.transient_threshold,
+                "min_calibration_intervals": args.min_calibration_intervals,
+            } if args.declare_transient_workload else None
+        )
+        try:
+            with Storage(_path(root, args.db)) as storage:
+                payload = build_change_monitor(storage, args.run_id, workload=workload)
+        except ValueError as exc:
+            raise CliError(
+                str(exc), details={"code": CLI_INVALID_ARGUMENT}
+            ) from exc
         sys.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
         return 0
     db_path = _path(root, args.db)

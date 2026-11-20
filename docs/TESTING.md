@@ -31,6 +31,7 @@ pytest -q tests/test_golden.py
 | CLI/integration | `test_cli_demo.py` | Real loopback mock servers on ephemeral ports, demo idempotency, plan, inspect, config exit code, golden mismatch, dry run. |
 | Safety | `test_safety.py` | `trust_env=False`, fixture-local-only resources, mock prefix routing, loopback redirect blocked, read-only console and loopback bind. |
 | Golden | `test_golden.py` | Fixture equality, field-level old/new differences, missing fixture error, CLI success, no absolute paths/local time, type mismatch. |
+| Change contracts | `test_change_monitor.py`, `test_change_contracts.py`, `test_change_contract_flow.py` | Legacy endpoint shape, both contracts, one-day calibration scope, closed-form model, every refusal boundary, ledger propagation, CLI surface. |
 
 ## 3. Deterministic fixtures
 
@@ -44,6 +45,11 @@ The shared demo fixtures exercise all major paths:
   seeds, out-of-site paths, non-loopback placeholders, and budget overflows.
 - `fixtures/pages/manifest.yaml` plus HTML files — 200, 302, 404, 500,
   fail-first, and oversized-body responses. All HTML is synthetic and local.
+- `fixtures/changes/two_state_panel.json` — a five-day sparse panel where
+  `p1`–`p4` succeed daily with two body states (16 one-day intervals, 4 with
+  different endpoints) and `target` is A, then fails three days, then is A.
+  This is the canonical change-contract fixture: calibration must use only the
+  16 one-day intervals, never the target's four-day same-fingerprint span.
 
 `tests/fakes.py` provides a deterministic `ReplaySession` that returns the same
 statuses, headers, and bytes as the mock sites without opening sockets. This

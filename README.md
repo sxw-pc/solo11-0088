@@ -54,6 +54,7 @@ byte-identical JSON and Markdown reports. `check-golden` exits with
 | `python -m crawlbudget serve --port 8765` | Start the read-only local review console (loopback only). |
 | `python -m crawlbudget inspect-run --run-id ID` | Print the stored run summary as JSON. |
 | `python -m crawlbudget check-golden --run-id ID` | Compare the stored report with `fixtures/expected/`. |
+| `python -m crawlbudget change-monitor --run-id ID --run-id ID` | Compare successful page bodies across runs and emit the two change contracts. |
 
 Common run options include `--config`, `--db`, `--reports-dir`, `--run-id`,
 `--virtual-start`, and `--dry-run`. Use `--help` on any subcommand for details.
@@ -139,6 +140,33 @@ lease IDs, offsets, reports, and fingerprints are identical.
 
 See [docs/COMPLIANCE.md](docs/COMPLIANCE.md) for the full threat model and
 operator checklist.
+
+## Cross-run change contracts
+
+`change-monitor` reads terminal per-URL events from the ledger and reports two
+independently authorized notification contracts over the same input:
+
+- **`current-body/v1`** — compares the current successful body hash with the
+  previous successful body hash. Equal hashes mean only that those two captures
+  matched; it never asserts that the body stayed unchanged on failed or
+  unobserved days.
+- **`transient-review/v1`** — only with an explicit
+  `--declare-transient-workload` (stable, mutually independent, common-rate,
+  symmetric two-state continuous-time Markov pages) does it pool **one-day
+  success-to-success intervals** into a shared per-day transition rate and turn
+  same-body sparse intervals into a model-conditional probability of at least
+  one hidden change. Above `--transient-threshold` (default `0.5`) it raises a
+  manual-review notification — a screening signal, never proof a change
+  occurred.
+
+Failed days are evidence gaps, never zero-change observations; same-run retries
+collapse to one terminal observation. Calibration never pools multi-day gaps,
+and the contracts refuse to emit a probability (`transient_model.reason`) when
+the workload is undeclared, the sample is too small, a third state appears,
+dates are not strictly increasing, or the estimate sits on the non-identifiable
+lambda boundary. The current-body result and its reason always survive a
+refusal. Results include the contracts, sample scope, parameters, target
+intervals, conditional probabilities, and a Wilson-interval uncertainty note.
 
 ## Ledger and reports
 

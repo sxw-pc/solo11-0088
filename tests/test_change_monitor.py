@@ -79,3 +79,10 @@ def test_two_state_panel_retains_long_gap_without_claiming_no_transient_change()
     }]
     calibration = [pages[f"p{i}.html"] for i in range(1, 5)]
     assert sum(x["different_bodies"] for page in calibration for x in page["intervals"]) == 4
+    # The legacy comparison layer keeps saying "same seen hash". It is not a
+    # no-transient-change claim, and without a declared workload neither
+    # contract is allowed to turn that into a probability.
+    assert target["current_body"]["different_bodies"] is False
+    assert target["current_body"]["notify"] is False
+    assert target["transient_review"]["status"] == "refused"
+    assert target["transient_review"]["probability"] is None
